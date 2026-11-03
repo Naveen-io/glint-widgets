@@ -102,12 +102,21 @@ namespace DeskWidgets
 
         protected override bool ShowWithoutActivation { get { return true; } }
 
+        // Owned by the desktop window, so "Show desktop" (Win+D) raises us with it instead of
+        // burying us behind it (an owned window always sits above its owner). This has to run
+        // after CreateHandle returns, not in OnHandleCreated: Form.CreateHandle fires that from
+        // inside, then overwrites GWL_HWNDPARENT with the hidden owner window it makes for
+        // ShowInTaskbar = false. Called again on every handle recreation, which is what we want.
+        protected override void CreateHandle()
+        {
+            base.CreateHandle();
+            IntPtr progman = Native.FindWindow("Progman", null);
+            if (progman != IntPtr.Zero) Native.SetOwner(Handle, progman);
+        }
+
         protected override void OnHandleCreated(EventArgs e)
         {
             base.OnHandleCreated(e);
-            // Owned by the desktop window so "Show desktop" (Win+D) doesn't hide us.
-            IntPtr progman = Native.FindWindow("Progman", null);
-            if (progman != IntPtr.Zero) Native.SetOwner(Handle, progman);
             PlaceOnScreen();
             OnStart();
             Render();
