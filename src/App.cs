@@ -535,20 +535,51 @@ namespace DeskWidgets
 
         static void SetAutostart(bool enabled, bool highPriority)
         {
-            // Clear both mechanisms.
-            try { using (var k = Registry.CurrentUser.CreateSubKey(RunKey)) k.DeleteValue(RunName, false); }
-            catch (Exception) { }
-            if (Current != null) Current.DeleteScheduledTask();
-
-            if (!enabled) return;
+            if (!enabled)
+            {
+                ClearRunKey();
+                if (Current != null) Current.DeleteScheduledTask();
+                return;
+            }
 
             if (highPriority)
-                Current.CreateScheduledTask();
+            {
+                if (Current != null) Current.CreateScheduledTask();
+                if (HasScheduledTask())
+                    ClearRunKey();
+                else
+                    WriteRunKey();
+            }
             else
             {
-                try { using (var k = Registry.CurrentUser.CreateSubKey(RunKey)) k.SetValue(RunName, RunCommand); }
-                catch (Exception) { }
+                WriteRunKey();
+                if (HasRunKey())
+                {
+                    if (Current != null) Current.DeleteScheduledTask();
+                }
             }
+        }
+
+        static void WriteRunKey()
+        {
+            try { using (var k = Registry.CurrentUser.CreateSubKey(RunKey)) k.SetValue(RunName, RunCommand); }
+            catch (Exception) { }
+        }
+
+        static void ClearRunKey()
+        {
+            try { using (var k = Registry.CurrentUser.CreateSubKey(RunKey)) k.DeleteValue(RunName, false); }
+            catch (Exception) { }
+        }
+
+        static bool HasRunKey()
+        {
+            try
+            {
+                using (var k = Registry.CurrentUser.OpenSubKey(RunKey))
+                    return k != null && k.GetValue(RunName) != null;
+            }
+            catch (Exception) { return false; }
         }
 
         static bool HasScheduledTask()
@@ -737,7 +768,7 @@ namespace DeskWidgets
                     "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\r\n" +
                     "<Task version=\"1.2\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\r\n" +
                     "  <Triggers>\r\n" +
-                    "    <LogonTrigger><Enabled>true</Enabled></LogonTrigger>\r\n" +
+                    "    <LogonTrigger><Enabled>true</Enabled><Delay>PT5S</Delay></LogonTrigger>\r\n" +
                     "  </Triggers>\r\n" +
                     "  <Principals>\r\n" +
                     "    <Principal><LogonType>InteractiveToken</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal>\r\n" +
