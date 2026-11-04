@@ -14,5 +14,10 @@ graphify-out/
 # server tests
 node_modules/
 
+# MSIX packaging
+packaging/cert/
+*.msix
+*.pfx
+
 # scratch / debug
 bugs and glitches/
