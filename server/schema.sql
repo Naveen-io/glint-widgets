@@ -121,6 +121,11 @@ drop trigger if exists versions_number on public.versions;
 create trigger versions_number before insert on public.versions
   for each row execute function public.next_version();
 
+-- ---------------------------------------------------------------- indexes
+
+create index if not exists idx_versions_approved_latest
+  on public.versions (widget_id, version desc) where status = 'approved';
+
 -- ---------------------------------------------------------------- row level security
 
 alter table public.profiles enable row level security;

@@ -75,6 +75,16 @@ namespace DeskWidgets
         const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
         const string RunName = "DeskWidgets";
 
+        // True when the app was installed from an MSIX package. Autostart, URL protocol
+        // and Start menu entry are all declared in the manifest instead of registry/shortcuts.
+        public static readonly bool IsPackaged = DetectPackaged();
+
+        static bool DetectPackaged()
+        {
+            try { return Windows.ApplicationModel.Package.Current != null; }
+            catch { return false; }
+        }
+
         public static App Current { get; private set; }
         // Folder holding widgets.ini and caches (AppData, or next to the exe in portable mode).
         public static string DataDir { get; private set; }
@@ -125,6 +135,7 @@ namespace DeskWidgets
                 foreach (var p in Plugins.Installed)
                     if (p.Type != null) OpenType(p.Id);
                 NotifyOrphanedWidgets();
+                WidgetRegistry.RaiseChanged();
             }, 5000);
 
             tray = new NotifyIcon { Icon = LoadIcon(SystemInformation.SmallIconSize), Text = AppName, Visible = true };
@@ -137,8 +148,12 @@ namespace DeskWidgets
             LoadAppTheme();
             ApplyProcessPriority(HighPriority);
             // Never touch the autostart entry on launch: it only changes when the user toggles it.
-            EnsureStartMenuShortcut();
-            EnsureUrlProtocol();
+            // MSIX declares the Start menu entry and deskwidgets:// protocol in the manifest.
+            if (!IsPackaged)
+            {
+                EnsureStartMenuShortcut();
+                EnsureUrlProtocol();
+            }
             SystemEvents.SessionSwitch += OnSessionSwitch;
             SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
             SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
@@ -146,7 +161,7 @@ namespace DeskWidgets
             showLibraryWait = ThreadPool.RegisterWaitForSingleObject(showLibrary,
                 delegate { messageWindow.PostOpenLibrary(); }, null, Timeout.Infinite, false);
 
-            if (openWindow || !config.Sections.Exists(s => s.Name != "app")) OpenLibrary();
+            if (openWindow) OpenLibrary();
             if (url != null) Ui.Later(delegate { Community.HandleUrl(url); }, 300);
 
             // Newer approved versions of installed community widgets: shortly after start, then daily.
@@ -469,11 +484,12 @@ namespace DeskWidgets
 
         static string RunCommand { get { return "\"" + Application.ExecutablePath + "\" --background"; } }
 
-        // On only if the entry starts this exe (registry Run key or scheduled task).
+        // On only if the entry starts this exe (registry Run key, scheduled task, or MSIX startup task).
         public static bool StartWithWindows
         {
             get
             {
+                if (IsPackaged) return GetPackagedAutostart();
                 using (var k = Registry.CurrentUser.OpenSubKey(RunKey))
                     if (k != null && string.Equals(k.GetValue(RunName) as string, RunCommand, StringComparison.OrdinalIgnoreCase))
                         return true;
@@ -481,7 +497,39 @@ namespace DeskWidgets
             }
             set
             {
+                if (IsPackaged) { SetPackagedAutostart(value); return; }
                 SetAutostart(value, Current != null && Current.HighPriority);
+            }
+        }
+
+        static bool GetPackagedAutostart()
+        {
+            try
+            {
+                var task = WaitAsync(Windows.ApplicationModel.StartupTask.GetAsync("DeskWidgetsStartup"));
+                return task.State == Windows.ApplicationModel.StartupTaskState.Enabled;
+            }
+            catch (Exception) { return false; }
+        }
+
+        static void SetPackagedAutostart(bool enabled)
+        {
+            try
+            {
+                var task = WaitAsync(Windows.ApplicationModel.StartupTask.GetAsync("DeskWidgetsStartup"));
+                if (enabled) WaitAsync(task.RequestEnableAsync());
+                else task.Disable();
+            }
+            catch (Exception) { }
+        }
+
+        static T WaitAsync<T>(Windows.Foundation.IAsyncOperation<T> op)
+        {
+            using (var done = new System.Threading.ManualResetEvent(false))
+            {
+                op.Completed = delegate { done.Set(); };
+                done.WaitOne(5000);
+                return op.GetResults();
             }
         }
 
@@ -753,17 +801,20 @@ namespace DeskWidgets
             // Remove autostart entry.
             StartWithWindows = false;
 
-            // Remove Start menu shortcut.
-            try
+            if (!IsPackaged)
             {
-                string lnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), AppName + ".lnk");
-                if (File.Exists(lnk)) File.Delete(lnk);
-            }
-            catch (Exception) { }
+                // Remove Start menu shortcut.
+                try
+                {
+                    string lnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), AppName + ".lnk");
+                    if (File.Exists(lnk)) File.Delete(lnk);
+                }
+                catch (Exception) { }
 
-            // Remove URL protocol registration.
-            try { Registry.CurrentUser.DeleteSubKeyTree(ProtocolKey, false); }
-            catch (Exception) { }
+                // Remove URL protocol registration.
+                try { Registry.CurrentUser.DeleteSubKeyTree(ProtocolKey, false); }
+                catch (Exception) { }
+            }
 
             // Delete settings and caches.
             string appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DeskWidgets");

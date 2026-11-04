@@ -80,7 +80,7 @@ Filename: "taskkill.exe"; Parameters: "/F /IM {#MyAppExeName}"; Flags: runhidden
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{userappdata}\DeskWidgets"
-Type: filesandordirs; Name: "{localappdata}\DeskWidgets"
+Type: filesandordirs; Name: "{localappdata}\DeskWidgets\previews"
 
 [Code]
 var
