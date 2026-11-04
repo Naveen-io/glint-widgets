@@ -214,19 +214,15 @@
     async function load() {
       if (!configured) { grid.replaceChildren(); status.replaceChildren(notice("The community gallery isn't connected yet. The built-in widgets come with the app.")); return; }
       try {
-        // Direct REST calls — same approach as the desktop app. No SDK download needed for the
-        // initial load; the listing and authors arrive in two parallel fetches.
-        const [widgetData, authorData] = await Promise.all([
-          restQuery("explore?select=id,version,name,category,description,api_version,author&order=reviewed_at.desc"),
-          restQuery("authors?select=username,bio"),
-        ]);
+        // Widgets are the essential data; authors are nice-to-have (People tab, search).
+        // Fetch them separately so a failing authors endpoint doesn't break the grid.
+        const widgetData = await restQuery("explore?select=id,version,name,category,description,api_version,author&order=reviewed_at.desc");
         widgets = (widgetData || []).filter(w => isValidId(w.id));
-        authors = authorData || [];
         if (!widgets.length) { grid.replaceChildren(); status.replaceChildren(el("div", { class: "empty" },
           el("p", { class: "t-card" }, "Nothing here yet."), el("p", {}, "Reviewed community widgets will appear here."))); }
         render();
-        loadAvatars();
         fetchAllPreviews();
+        restQuery("authors?select=username,bio").then(data => { authors = data || []; loadAvatars(); }).catch(() => {});
       } catch (e) {
         grid.replaceChildren();
         status.replaceChildren(notice("The gallery couldn't load. Check your connection and reload the page.", true));
