@@ -57,6 +57,7 @@ Name: "startwithwindows"; Description: "Start with Windows"; GroupDescription: "
 
 [Files]
 Source: "..\bin\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "assets\icon-96.bmp"; Flags: dontcopy
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -84,6 +85,9 @@ Type: filesandordirs; Name: "{localappdata}\DeskWidgets"
 [Code]
 var
   ResultCode: Integer;
+  IconBmp: TBitmap;
+  pageW, pageH, iconX, iconY, textW, textX, textY: Integer;
+  R: TRect;
 
 function GetWindowLong(hWnd: HWND; nIndex: Integer): Longint;
   external 'GetWindowLongW@user32.dll stdcall';
@@ -93,6 +97,8 @@ function SetWindowPos(hWnd: HWND; hWndInsertAfter: HWND; X, Y, cx, cy: Integer; 
   external 'SetWindowPos@user32.dll stdcall';
 function SetWindowTheme(hWnd: HWND; pszSubAppName: String; pszSubIdList: String): Integer;
   external 'SetWindowTheme@uxtheme.dll stdcall';
+function BitBlt(hdcDest: THandle; nXDest, nYDest, nWidth, nHeight: Integer; hdcSrc: THandle; nXSrc, nYSrc: Integer; dwRop: Cardinal): Boolean;
+  external 'BitBlt@gdi32.dll stdcall';
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
@@ -112,8 +118,8 @@ begin
 
   WizardForm.MainPanel.Color := $FFFFFF;
   WizardForm.InnerPage.Color := $FFFFFF;
-  WizardForm.WelcomePage.Color := $FFFFFF;
-  WizardForm.FinishedPage.Color := $FFFFFF;
+  WizardForm.WelcomePage.Color := $F7F5F5;
+  WizardForm.FinishedPage.Color := $F7F5F5;
   WizardForm.LicensePage.Color := $FFFFFF;
   WizardForm.SelectDirPage.Color := $FFFFFF;
   WizardForm.SelectTasksPage.Color := $FFFFFF;
@@ -129,21 +135,71 @@ begin
   WizardForm.PageNameLabel.Top := WizardForm.PageNameLabel.Top + 4;
   WizardForm.PageDescriptionLabel.Top := WizardForm.PageDescriptionLabel.Top + 4;
 
+  // Welcome + finished pages: full-page centered layout drawn at runtime
+  WizardForm.WelcomeLabel1.Visible := False;
+  WizardForm.WelcomeLabel2.Visible := False;
+  WizardForm.FinishedHeadingLabel.Visible := False;
+  WizardForm.FinishedLabel.Visible := False;
+
+  ExtractTemporaryFile('icon-96.bmp');
+  IconBmp := TBitmap.Create;
+  IconBmp.LoadFromFile(ExpandConstant('{tmp}\icon-96.bmp'));
+
   // Welcome page
-  WizardForm.WelcomeLabel1.Font.Color := $1F1D1D;
-  WizardForm.WelcomeLabel1.Font.Name := 'Segoe UI Variable Display';
-  WizardForm.WelcomeLabel1.Font.Size := 22;
-  WizardForm.WelcomeLabel1.Font.Style := [fsBold];
-  WizardForm.WelcomeLabel2.Font.Color := $736E6E;
-  WizardForm.WelcomeLabel2.Font.Name := 'Segoe UI Variable Text';
+  pageW := WizardForm.WizardBitmapImage.Parent.Width;
+  pageH := WizardForm.WizardBitmapImage.Parent.Height;
+  WizardForm.WizardBitmapImage.Stretch := False;
+  WizardForm.WizardBitmapImage.SetBounds(0, 0, pageW, pageH);
+  WizardForm.WizardBitmapImage.Bitmap.Width := pageW;
+  WizardForm.WizardBitmapImage.Bitmap.Height := pageH;
+  WizardForm.WizardBitmapImage.Bitmap.Canvas.Brush.Color := $F7F5F5;
+  R.Left := 0; R.Top := 0; R.Right := pageW; R.Bottom := pageH;
+  WizardForm.WizardBitmapImage.Bitmap.Canvas.FillRect(R);
+  iconX := (pageW - 96) div 2;
+  iconY := (pageH div 2) - 80;
+  BitBlt(WizardForm.WizardBitmapImage.Bitmap.Canvas.Handle, iconX, iconY, 96, 96, IconBmp.Canvas.Handle, 0, 0, $00CC0020);
+  WizardForm.WizardBitmapImage.Bitmap.Canvas.Brush.Style := bsClear;
+  WizardForm.WizardBitmapImage.Bitmap.Canvas.Font.Name := 'Segoe UI Variable Display';
+  WizardForm.WizardBitmapImage.Bitmap.Canvas.Font.Size := 22;
+  WizardForm.WizardBitmapImage.Bitmap.Canvas.Font.Style := [fsBold];
+  WizardForm.WizardBitmapImage.Bitmap.Canvas.Font.Color := $1F1D1D;
+  textW := WizardForm.WizardBitmapImage.Bitmap.Canvas.TextWidth('Desk Widgets');
+  textX := (pageW - textW) div 2;
+  textY := iconY + 96 + 16;
+  WizardForm.WizardBitmapImage.Bitmap.Canvas.TextOut(textX, textY, 'Desk Widgets');
 
   // Finished page
-  WizardForm.FinishedHeadingLabel.Font.Color := $1F1D1D;
-  WizardForm.FinishedHeadingLabel.Font.Name := 'Segoe UI Variable Display';
-  WizardForm.FinishedHeadingLabel.Font.Size := 22;
-  WizardForm.FinishedHeadingLabel.Font.Style := [fsBold];
-  WizardForm.FinishedLabel.Font.Color := $736E6E;
-  WizardForm.FinishedLabel.Font.Name := 'Segoe UI Variable Text';
+  pageW := WizardForm.WizardBitmapImage2.Parent.Width;
+  pageH := WizardForm.WizardBitmapImage2.Parent.Height;
+  WizardForm.WizardBitmapImage2.Stretch := False;
+  WizardForm.WizardBitmapImage2.SetBounds(0, 0, pageW, pageH);
+  WizardForm.WizardBitmapImage2.Bitmap.Width := pageW;
+  WizardForm.WizardBitmapImage2.Bitmap.Height := pageH;
+  WizardForm.WizardBitmapImage2.Bitmap.Canvas.Brush.Color := $F7F5F5;
+  R.Left := 0; R.Top := 0; R.Right := pageW; R.Bottom := pageH;
+  WizardForm.WizardBitmapImage2.Bitmap.Canvas.FillRect(R);
+  iconX := (pageW - 96) div 2;
+  iconY := (pageH div 2) - 96;
+  BitBlt(WizardForm.WizardBitmapImage2.Bitmap.Canvas.Handle, iconX, iconY, 96, 96, IconBmp.Canvas.Handle, 0, 0, $00CC0020);
+  WizardForm.WizardBitmapImage2.Bitmap.Canvas.Brush.Style := bsClear;
+  WizardForm.WizardBitmapImage2.Bitmap.Canvas.Font.Name := 'Segoe UI Variable Display';
+  WizardForm.WizardBitmapImage2.Bitmap.Canvas.Font.Size := 22;
+  WizardForm.WizardBitmapImage2.Bitmap.Canvas.Font.Style := [fsBold];
+  WizardForm.WizardBitmapImage2.Bitmap.Canvas.Font.Color := $1F1D1D;
+  textW := WizardForm.WizardBitmapImage2.Bitmap.Canvas.TextWidth('You''re all set.');
+  textX := (pageW - textW) div 2;
+  textY := iconY + 96 + 16;
+  WizardForm.WizardBitmapImage2.Bitmap.Canvas.TextOut(textX, textY, 'You''re all set.');
+  WizardForm.WizardBitmapImage2.Bitmap.Canvas.Font.Name := 'Segoe UI Variable Text';
+  WizardForm.WizardBitmapImage2.Bitmap.Canvas.Font.Size := 10;
+  WizardForm.WizardBitmapImage2.Bitmap.Canvas.Font.Style := [];
+  WizardForm.WizardBitmapImage2.Bitmap.Canvas.Font.Color := $736E6E;
+  textW := WizardForm.WizardBitmapImage2.Bitmap.Canvas.TextWidth('Desk Widgets is ready to use.');
+  textX := (pageW - textW) div 2;
+  textY := textY + 40;
+  WizardForm.WizardBitmapImage2.Bitmap.Canvas.TextOut(textX, textY, 'Desk Widgets is ready to use.');
+
+  IconBmp.Free;
 
   // Directory edit
   WizardForm.DirEdit.Color := $F7F5F5;
@@ -175,9 +231,11 @@ begin
   WizardForm.StatusLabel.Font.Color := $736E6E;
   WizardForm.FilenameLabel.Font.Color := $8B8686;
 
-  // Run list (launch checkbox on finish page)
-  WizardForm.RunList.Color := $FFFFFF;
+  // Run list (launch checkbox on finish page — on top of full-page image)
+  WizardForm.RunList.BringToFront;
+  WizardForm.RunList.Color := $F7F5F5;
   WizardForm.RunList.Font.Color := $1F1D1D;
+  WizardForm.RunList.Left := (pageW - WizardForm.RunList.Width) div 2;
 
   // Bevel lines
   WizardForm.Bevel.Visible := False;
