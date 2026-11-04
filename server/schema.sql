@@ -221,6 +221,9 @@ create or replace view public.explore as
    where v.status = 'approved'
    order by v.widget_id, v.version desc;
 
+alter view public.authors set (security_invoker = false);
+alter view public.explore set (security_invoker = false);
+
 revoke all on public.authors, public.explore from anon, authenticated;
 grant select on public.authors, public.explore to anon, authenticated;
 
