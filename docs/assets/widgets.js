@@ -168,7 +168,7 @@ export function focusTimer(canvas, theme = "light") {
   const pal = TIMER_THEMES[theme];
 
   let running = false, totalSec = 25 * 60, leftSec = 25 * 60, endTime = null;
-  let raf;
+  let raf = 0, onScreen = false;
 
   function secondsLeft() {
     if (running) return Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
@@ -210,6 +210,7 @@ export function focusTimer(canvas, theme = "light") {
     } else if (within(px, py, resetCx, resetCy, 17)) {
       reset();
     }
+    kick();
   });
 
   function draw() {
@@ -299,9 +300,19 @@ export function focusTimer(canvas, theme = "light") {
     ctx.lineTo(ax + as2 * 1.3, ay - as2 * 0.2);
     ctx.lineTo(ax - as2 * 0.3, ay + as2 * 1.2);
     ctx.fill();
-
-    raf = requestAnimationFrame(draw);
   }
+
+  // Nothing on this card moves unless the timer is running, so idle means draw once and
+  // stop rather than burn a frame callback on two 170px canvases at up to 3x DPR.
+  function tick() {
+    raf = 0;
+    draw();
+    if (running && onScreen && !document.hidden) raf = requestAnimationFrame(tick);
+  }
+  function kick() { if (!raf) raf = requestAnimationFrame(tick); }
+
+  new IntersectionObserver((es) => { onScreen = es[0].isIntersecting; kick(); }).observe(canvas);
+  document.addEventListener("visibilitychange", kick);
   draw();
   return () => cancelAnimationFrame(raf);
 }

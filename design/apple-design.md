@@ -799,6 +799,14 @@ alternating grey and black, each with a centered headline, one line, actions and
 renders (`docs/assets/img`, made from the widgets' own previews at 2×). Stats use the callout
 style (§2.2). The gallery itself is `explore.html`.
 
+The hero carousel has two modes, and both drift slowly, carry on scrolling under a finger and
+stop dead under `prefers-reduced-motion`. Pointers that hover get the concave 3D ring; phones
+and tablets (`(max-width: 734px), (hover: none) and (pointer: coarse)`) get a flat horizontal
+track of about ten cards with 12 px gaps, no perspective and no 3D transforms. The ring is the
+flourish, not the content: a touch device must never pay for it. Cards keep the widget corner
+radius of §17.13 scaled to their height, and a card never reaches the CSS camera plane --
+`tools/carousel-check.mjs` is the proof and runs on every change to the ring's geometry.
+
 ### 17.11 Website
 `docs/assets/site.css` implements §14 with the light and dark tokens of §4: the 44 px glass nav,
 a 980 px column (1024 with 22 px gutters), a 56/60 hero with a two-tone intro, the pill segmented
