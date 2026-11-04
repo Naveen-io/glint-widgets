@@ -340,8 +340,8 @@ namespace DeskWidgets
             {
                 bool on = !startupToggle.On;
                 try { App.StartWithWindows = on; }
-                catch (Exception) { on = startupToggle.On; }
-                startupToggle.On = on;
+                catch (Exception) { }
+                startupToggle.On = App.StartWithWindows;
                 startupToggle.Invalidate();
             };
             content.Controls.Add(startupToggle);
