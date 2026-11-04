@@ -190,14 +190,6 @@ begin
   textX := (pageW - textW) div 2;
   textY := iconY + 96 + 16;
   WizardForm.WizardBitmapImage2.Bitmap.Canvas.TextOut(textX, textY, 'You''re all set.');
-  WizardForm.WizardBitmapImage2.Bitmap.Canvas.Font.Name := 'Segoe UI Variable Text';
-  WizardForm.WizardBitmapImage2.Bitmap.Canvas.Font.Size := 10;
-  WizardForm.WizardBitmapImage2.Bitmap.Canvas.Font.Style := [];
-  WizardForm.WizardBitmapImage2.Bitmap.Canvas.Font.Color := $736E6E;
-  textW := WizardForm.WizardBitmapImage2.Bitmap.Canvas.TextWidth('Desk Widgets is ready to use.');
-  textX := (pageW - textW) div 2;
-  textY := textY + 40;
-  WizardForm.WizardBitmapImage2.Bitmap.Canvas.TextOut(textX, textY, 'Desk Widgets is ready to use.');
 
   IconBmp.Free;
 
