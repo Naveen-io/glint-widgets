@@ -235,7 +235,10 @@ begin
   WizardForm.RunList.BringToFront;
   WizardForm.RunList.Color := $F7F5F5;
   WizardForm.RunList.Font.Color := $1F1D1D;
+  WizardForm.RunList.Height := ScaleY(24);
+  WizardForm.RunList.Width := ScaleX(200);
   WizardForm.RunList.Left := (pageW - WizardForm.RunList.Width) div 2;
+  WizardForm.RunList.Top := textY + ScaleY(30);
 
   // Bevel lines
   WizardForm.Bevel.Visible := False;
