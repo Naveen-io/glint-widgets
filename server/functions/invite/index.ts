@@ -60,12 +60,32 @@ Deno.serve(async (req) => {
   }
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return reply(400, { error: "That email address doesn't look right." });
 
-  const { error } = await admin.auth.admin.inviteUserByEmail(email, {
+  let { error } = await admin.auth.admin.inviteUserByEmail(email, {
     redirectTo: SITE_URL ? SITE_URL + "/account.html" : undefined,
   });
   if (error) {
     const known = /already|registered|exists/i.test(error.message);
-    return reply(known ? 409 : 400, { error: known ? email + " already has an account." : error.message });
+    if (!known) return reply(400, { error: error.message });
+    // The address already has an auth.users row. If they finished their account (have a
+    // profile), it genuinely exists and they should sign in or reset their password. If they
+    // never finished, the old invite expired — delete the orphan and re-invite.
+    const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000 });
+    const existing = (list?.users ?? []).find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
+    if (!existing) return reply(409, { error: email + " already has an account." });
+    const { data: profile } = await admin.from("profiles").select("id").eq("id", existing.id).maybeSingle();
+    if (profile) {
+      // Real account — mark the request handled so it leaves the admin queue, then stop.
+      if (request != null)
+        await admin.from("access_requests").update({ status: "accepted", decided_at: new Date().toISOString() }).eq("id", request);
+      return reply(409, { error: email + " already has an account." });
+    }
+    // Orphaned auth user (invite expired before they finished). Delete and re-invite.
+    const { error: delErr } = await admin.auth.admin.deleteUser(existing.id);
+    if (delErr) return reply(500, { error: "Couldn't clean up the expired invite: " + delErr.message });
+    const retry = await admin.auth.admin.inviteUserByEmail(email, {
+      redirectTo: SITE_URL ? SITE_URL + "/account.html" : undefined,
+    });
+    if (retry.error) return reply(400, { error: retry.error.message });
   }
 
   // Remembered either way, so the same address can't queue another request.

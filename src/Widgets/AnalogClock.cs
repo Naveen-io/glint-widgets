@@ -80,7 +80,16 @@ namespace DeskWidgets.Widgets
             LoadZone();
         }
 
-        int Diameter { get { return Px(Settings.GetInt("size", 170)); } }
+        protected override bool SquareResize { get { return true; } }
+
+        int Diameter
+        {
+            get
+            {
+                int cw = Settings.GetInt("custom_w", 0);
+                return cw > 0 ? cw : Px(Settings.GetInt("size", 170));
+            }
+        }
         string SecondsMode { get { return Settings.Get("seconds", "tick"); } } // off | tick | smooth
         string FaceSetting { get { return Settings.Get("face", "light"); } }
         Theme CurrentTheme { get { return FaceSetting == "vibrant" ? VibrantTheme : FaceSetting == "dark" ? DarkTheme : LightTheme; } }
@@ -152,6 +161,10 @@ namespace DeskWidgets.Widgets
                 Dot(g, secondsBrush, c, s * 0.021f);
                 Dot(g, pinBrush, c, s * 0.008f);
             }
+
+            // Alpha=1 fill so the transparent corners receive mouse events (layered window hit-test).
+            using (var hit = new SolidBrush(Color.FromArgb(1, 0, 0, 0)))
+                g.FillRectangle(hit, 0, 0, s, s);
         }
 
         // Thin stem from the hub, then a thicker rounded arm (the macOS hand shape).

@@ -7,8 +7,6 @@
   <meta name="description" content="Free, lightweight desktop widgets for Windows, and widgets made by the community.">
   <link rel="stylesheet" href="assets/site.css">
   <link rel="preconnect" href="https://vtgsbgkjleyqlxgjdvqy.supabase.co">
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm">
 </head>
 <body>
   <main class="content">
@@ -50,7 +48,7 @@
   </main>
 
   <script type="module">
-    import { nav, el, art, avatar, getButton, supabase, configured, CATEGORIES, categoryName, isValidId, notice, DOWNLOAD_URL } from "./assets/site.js";
+    import { nav, el, art, avatar, getButton, supabase, restQuery, configured, CATEGORIES, categoryName, isValidId, notice, DOWNLOAD_URL } from "./assets/site.js";
 
     nav("explore");
 
@@ -60,7 +58,7 @@
     const viewWidgets = document.getElementById("view-widgets");
     const viewPeople = document.getElementById("view-people");
     const peopleGrid = document.getElementById("people-grid");
-    let widgets = [], authors = [], category = null, peopleMode = false;
+    let widgets = [], authors = [], category = null, peopleMode = false, avatarsLoaded = false;
 
     // Build filter pills including People
     for (const [id, name] of [[null, "All"], ...CATEGORIES]) {
@@ -70,13 +68,27 @@
     filters.append(el("button", { type: "button", class: "pill people", "aria-pressed": "false",
       onclick: () => { selectCategory("people"); }, "data-id": "people" }, "People"));
 
+    async function loadAvatars() {
+      if (avatarsLoaded) return;
+      avatarsLoaded = true;
+      try {
+        const db = await supabase();
+        const { data } = await db.from("authors").select("username, avatar");
+        if (data) {
+          const map = new Map(data.map(a => [a.username, a.avatar]));
+          for (const a of authors) a.avatar = map.get(a.username) || null;
+        }
+        if (peopleMode) renderPeople();
+      } catch { avatarsLoaded = false; }
+    }
+
     function selectCategory(id) {
       peopleMode = id === "people";
       category = peopleMode ? null : id;
       for (const b of filters.children) b.setAttribute("aria-pressed", String(b.dataset.id === String(id)));
       viewWidgets.hidden = peopleMode;
       viewPeople.hidden = !peopleMode;
-      if (peopleMode) renderPeople();
+      if (peopleMode) { renderPeople(); loadAvatars(); }
       else render();
     }
 
@@ -124,42 +136,31 @@
       searchResults.hidden = false;
     }
 
-    let previewBatchTimer = null;
-    const pendingPreviews = new Map();
+    // Preview cache: keyed by "id_version" so a new version invalidates the old preview.
+    const previewCache = new Map();
 
-    const previewObserver = new IntersectionObserver((entries, obs) => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        const artEl = entry.target, id = artEl.dataset.widgetId;
-        obs.unobserve(artEl);
-        pendingPreviews.set(id, artEl);
-      }
-      if (pendingPreviews.size && !previewBatchTimer)
-        previewBatchTimer = setTimeout(flushPreviews, 50);
-    }, { rootMargin: "200px" });
-
-    async function flushPreviews() {
-      previewBatchTimer = null;
-      const batch = new Map(pendingPreviews);
-      pendingPreviews.clear();
-      const ids = [...batch.keys()];
+    // Batch-fetch all previews in one REST call (same as the desktop app's Community.FetchPreviews).
+    async function fetchAllPreviews() {
+      if (!widgets.length) return;
+      const ids = widgets.map(w => w.id);
       try {
-        const db = await supabase();
-        const { data } = await db.from("explore").select("id, preview").in("id", ids);
-        const map = new Map((data || []).map(r => [r.id, r.preview]));
-        for (const [id, artEl] of batch) {
-          const preview = map.get(id);
+        const rows = await restQuery("explore?select=id,version,preview&id=in.(" + ids.join(",") + ")");
+        for (const r of rows) {
+          if (r.preview) previewCache.set(r.id, r.preview);
+        }
+        for (const artEl of grid.querySelectorAll(".art.skeleton[data-widget-id]")) {
+          const id = artEl.dataset.widgetId;
+          const preview = previewCache.get(id);
           const w = widgets.find(w => w.id === id);
+          artEl.className = "art";
           if (preview) {
-            artEl.className = "art";
             artEl.replaceChildren(el("img", { src: "data:image/png;base64," + preview, alt: (w ? w.name : id) + " preview" }));
           } else {
-            artEl.className = "art";
             artEl.replaceChildren(el("span", { class: "none" }, "No preview"));
           }
         }
       } catch {
-        for (const [, artEl] of batch) {
+        for (const artEl of grid.querySelectorAll(".art.skeleton[data-widget-id]")) {
           artEl.className = "art";
           artEl.replaceChildren(el("span", { class: "none" }, "No preview"));
         }
@@ -167,8 +168,11 @@
     }
 
     function widgetCard(w) {
-      const artEl = el("div", { class: "art skeleton", "data-widget-id": w.id });
-      previewObserver.observe(artEl);
+      const cached = previewCache.get(w.id);
+      const artEl = cached
+        ? el("div", { class: "art", "data-widget-id": w.id },
+            el("img", { src: "data:image/png;base64," + cached, alt: w.name + " preview" }))
+        : el("div", { class: "art skeleton", "data-widget-id": w.id });
       return el("article", { class: "widget-card" },
         el("a", { href: "widget.html?id=" + encodeURIComponent(w.id), "aria-label": w.name }, artEl),
         el("div", { class: "widget-card-body" },
@@ -210,18 +214,19 @@
     async function load() {
       if (!configured) { grid.replaceChildren(); status.replaceChildren(notice("The community gallery isn't connected yet. The built-in widgets come with the app.")); return; }
       try {
-        const db = await supabase();
-        const [{ data: widgetData, error: wErr }, { data: authorData, error: aErr }] = await Promise.all([
-          db.from("explore").select("id, version, name, category, description, api_version, sha256, reviewed_at, author").order("reviewed_at", { ascending: false }),
-          db.from("authors").select("username, bio, avatar"),
+        // Direct REST calls — same approach as the desktop app. No SDK download needed for the
+        // initial load; the listing and authors arrive in two parallel fetches.
+        const [widgetData, authorData] = await Promise.all([
+          restQuery("explore?select=id,version,name,category,description,api_version,author&order=reviewed_at.desc"),
+          restQuery("authors?select=username,bio"),
         ]);
-        if (wErr) throw wErr;
-        if (aErr) throw aErr;
         widgets = (widgetData || []).filter(w => isValidId(w.id));
         authors = authorData || [];
         if (!widgets.length) { grid.replaceChildren(); status.replaceChildren(el("div", { class: "empty" },
           el("p", { class: "t-card" }, "Nothing here yet."), el("p", {}, "Reviewed community widgets will appear here."))); }
         render();
+        loadAvatars();
+        fetchAllPreviews();
       } catch (e) {
         grid.replaceChildren();
         status.replaceChildren(notice("The gallery couldn't load. Check your connection and reload the page.", true));

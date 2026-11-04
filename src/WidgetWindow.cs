@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -50,6 +51,8 @@ namespace DeskWidgets
                 int p = pct;
                 opacity.AddChoice(p + "%", OpacityPercent == p, delegate { Settings.Set("opacity", p); Render(); });
             }
+            if (Settings.GetInt("custom_w", 0) > 0)
+                menu.Add("Reset Size", delegate { Settings.Remove("custom_w"); Settings.Remove("custom_h"); Render(); });
             menu.AddSeparator();
             menu.Add("Open Desk Widgets", App.Current.OpenLibrary);
             menu.AddSeparator();
@@ -60,18 +63,95 @@ namespace DeskWidgets
         protected bool Locked { get { return Settings.GetBool("locked", false); } }
         int OpacityPercent { get { return Math.Max(10, Math.Min(100, Settings.GetInt("opacity", 100))); } }
 
+        // ---- free resize ----
+        enum Corner { None, TopLeft, TopRight, BottomLeft, BottomRight }
+
+        Corner hoverCorner;
+        Corner resizeCorner;
+        Point resizeStart;
+        Point resizeOrigin; // top-left at the start of the resize
+        Size resizeOriginalSize;
+        static readonly int ResizeZone = 24;
+        static readonly int ResizeMin = 80;
+
+        // Subclasses override to accept or reject resize (e.g. return false if the widget is fixed-size).
+        protected virtual bool CanResize { get { return true; } }
+        // Override to true for widgets that must stay square (e.g. circular clock face).
+        protected virtual bool SquareResize { get { return false; } }
+
+        // Called when the user finishes a resize. Subclasses can snap to preferred sizes here.
+        protected virtual void OnResized(int width, int height) { }
+
+        Corner CornerAt(Point p)
+        {
+            if (Locked || !CanResize) return Corner.None;
+            int zone = Px(ResizeZone);
+            Size sz = GetSize();
+            bool left = p.X < zone, right = p.X >= sz.Width - zone;
+            bool top = p.Y < zone, bottom = p.Y >= sz.Height - zone;
+            if (top && left) return Corner.TopLeft;
+            if (top && right) return Corner.TopRight;
+            if (bottom && left) return Corner.BottomLeft;
+            if (bottom && right) return Corner.BottomRight;
+            return Corner.None;
+        }
+
+        static Cursor CursorForCorner(Corner c)
+        {
+            if (c == Corner.TopLeft || c == Corner.BottomRight) return Cursors.SizeNWSE;
+            if (c == Corner.TopRight || c == Corner.BottomLeft) return Cursors.SizeNESW;
+            return Cursors.Default;
+        }
+
+        void DrawResizeHandle(Graphics g, Corner c)
+        {
+            if (c == Corner.None) return;
+            Size sz = GetSize();
+            float r = Px(14);
+            float inset = Px(6);
+            float thick = Px(2.5f);
+
+            float cx, cy;
+            float startAngle;
+            switch (c)
+            {
+                case Corner.TopLeft: cx = inset + r; cy = inset + r; startAngle = 180; break;
+                case Corner.TopRight: cx = sz.Width - inset - r; cy = inset + r; startAngle = 270; break;
+                case Corner.BottomLeft: cx = inset + r; cy = sz.Height - inset - r; startAngle = 90; break;
+                default: cx = sz.Width - inset - r; cy = sz.Height - inset - r; startAngle = 0; break;
+            }
+
+            using (var pen = new Pen(Color.FromArgb(180, 255, 255, 255), thick))
+            {
+                pen.StartCap = LineCap.Round;
+                pen.EndCap = LineCap.Round;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.DrawArc(pen, cx - r, cy - r, r * 2, r * 2, startAngle, 90);
+            }
+        }
+
+        Size GetSize()
+        {
+            int cw = Settings.GetInt("custom_w", 0), ch = Settings.GetInt("custom_h", 0);
+            if (cw > 0 && ch > 0) return new Size(cw, ch);
+            return Measure();
+        }
+
         public void Render()
         {
             if (!IsHandleCreated || IsDisposed || paused) return;
-            Size sz = Measure();
+            Size sz = GetSize();
             if (surface == null || surface.Width != sz.Width || surface.Height != sz.Height)
             {
                 if (surface != null) surface.Dispose();
                 surface = new LayeredSurface(sz.Width, sz.Height);
-                Size = sz;
-                PlaceOnScreen(); // keep the same relative anchor when the size changes
+                if (resizeCorner == Corner.None)
+                    PlaceOnScreen(); // keep the same relative anchor when the size changes
             }
+            if (Size != sz) Size = sz;
             Draw(surface.Graphics);
+            Corner handle = resizeCorner != Corner.None ? resizeCorner : hoverCorner;
+            if (handle != Corner.None) DrawResizeHandle(surface.Graphics, handle);
             surface.Present(Handle, (byte)(OpacityPercent * 255 / 100));
 
             int delay = NextFrameDelay();
@@ -193,13 +273,13 @@ namespace DeskWidgets
         // background fetches, etc. here rather than in the constructor.
         protected virtual void OnStart() { }
 
-        public Size WidgetSize { get { return Measure(); } }
+        public Size WidgetSize { get { return GetSize(); } }
 
         // Positions are stored as fractions (0..1) of the monitor's free space, so a widget in
         // the top-right corner stays there on any resolution, DPI or machine.
         internal void MoveTo(Point topLeft)
         {
-            Size sz = Measure();
+            Size sz = GetSize();
             Screen screen = Screen.FromRectangle(new Rectangle(topLeft, sz));
             Rectangle wa = screen.WorkingArea;
             Settings.Set("screen", screen.DeviceName);
@@ -220,7 +300,7 @@ namespace DeskWidgets
 
         void PlaceOnScreen()
         {
-            Size sz = Measure();
+            Size sz = GetSize();
             float fx = Settings.GetFloat("fx", float.NaN), fy = Settings.GetFloat("fy", float.NaN);
             if (float.IsNaN(fx) || float.IsNaN(fy))
             {
@@ -241,7 +321,7 @@ namespace DeskWidgets
         // Renders the widget into a new bitmap (used for library previews and the drag ghost).
         internal Bitmap Snapshot()
         {
-            Size sz = Measure();
+            Size sz = GetSize();
             var bmp = new Bitmap(sz.Width, sz.Height, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
             bmp.SetResolution(96, 96);
             using (var g = Graphics.FromImage(bmp))
@@ -287,6 +367,19 @@ namespace DeskWidgets
         {
             base.OnMouseDown(e);
             if (e.Button != MouseButtons.Left) return;
+
+            // Start resize if clicking on a corner handle.
+            Corner c = CornerAt(e.Location);
+            if (c != Corner.None)
+            {
+                resizeCorner = c;
+                resizeStart = PointToScreen(e.Location);
+                resizeOrigin = Location;
+                resizeOriginalSize = Size;
+                Capture = true;
+                return;
+            }
+
             pressed = true;
             pressedAt = e.Location;
         }
@@ -294,8 +387,54 @@ namespace DeskWidgets
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
-            Cursor want = IsButton(e.Location) ? Cursors.Hand : Cursors.Default;
+
+            // Active resize: adjust size and position as the mouse moves.
+            if (resizeCorner != Corner.None)
+            {
+                Point screen = PointToScreen(e.Location);
+                int dx = screen.X - resizeStart.X;
+                int dy = screen.Y - resizeStart.Y;
+                int newW = resizeOriginalSize.Width, newH = resizeOriginalSize.Height;
+                int newX = resizeOrigin.X, newY = resizeOrigin.Y;
+                int min = Px(ResizeMin);
+
+                if (resizeCorner == Corner.BottomRight) { newW += dx; newH += dy; }
+                else if (resizeCorner == Corner.BottomLeft) { newW -= dx; newH += dy; newX = resizeOrigin.X + dx; }
+                else if (resizeCorner == Corner.TopRight) { newW += dx; newH -= dy; newY = resizeOrigin.Y + dy; }
+                else { newW -= dx; newH -= dy; newX = resizeOrigin.X + dx; newY = resizeOrigin.Y + dy; }
+
+                if (newW < min) { if (resizeCorner == Corner.TopLeft || resizeCorner == Corner.BottomLeft) newX -= min - newW; newW = min; }
+                if (newH < min) { if (resizeCorner == Corner.TopLeft || resizeCorner == Corner.TopRight) newY -= min - newH; newH = min; }
+
+                if (SquareResize)
+                {
+                    int side = Math.Max(newW, newH);
+                    int dw = side - newW, dh = side - newH;
+                    if (resizeCorner == Corner.TopLeft || resizeCorner == Corner.BottomLeft) newX -= dw;
+                    if (resizeCorner == Corner.TopLeft || resizeCorner == Corner.TopRight) newY -= dh;
+                    newW = side;
+                    newH = side;
+                }
+
+                Settings.Set("custom_w", newW);
+                Settings.Set("custom_h", newH);
+                Location = new Point(newX, newY);
+                Render();
+                return;
+            }
+
+            // Corner hover detection: show resize handle when near a corner.
+            Corner c = CornerAt(e.Location);
+            if (c != hoverCorner)
+            {
+                hoverCorner = c;
+                Render();
+            }
+
+            Cursor want = c != Corner.None ? CursorForCorner(c)
+                : IsButton(e.Location) ? Cursors.Hand : Cursors.Default;
             if (Cursor != want) Cursor = want;
+
             // Only drag while the left button is really held: a press whose release we never saw
             // (a dialog opened, the release happened elsewhere) must not turn a later hover into a drag.
             if ((MouseButtons & MouseButtons.Left) == 0) pressed = false;
@@ -310,11 +449,46 @@ namespace DeskWidgets
         protected override void OnMouseUp(MouseEventArgs e)
         {
             base.OnMouseUp(e);
+
+            if (resizeCorner != Corner.None && e.Button == MouseButtons.Left)
+            {
+                Capture = false;
+                OnResized(Size.Width, Size.Height);
+                MoveTo(Location);
+                resizeCorner = Corner.None;
+                Render();
+                return;
+            }
+
             if (e.Button == MouseButtons.Right) ShowMenu();
             else if (e.Button == MouseButtons.Left && pressed)
             {
                 pressed = false;
                 OnWidgetClick(e.Location);
+            }
+        }
+
+        protected override void OnMouseDoubleClick(MouseEventArgs e)
+        {
+            base.OnMouseDoubleClick(e);
+            if (e.Button == MouseButtons.Left && CornerAt(e.Location) != Corner.None
+                && Settings.GetInt("custom_w", 0) > 0)
+            {
+                resizeCorner = Corner.None;
+                Capture = false;
+                Settings.Remove("custom_w");
+                Settings.Remove("custom_h");
+                Render();
+            }
+        }
+
+        protected override void OnMouseLeave(EventArgs e)
+        {
+            base.OnMouseLeave(e);
+            if (hoverCorner != Corner.None)
+            {
+                hoverCorner = Corner.None;
+                Render();
             }
         }
 

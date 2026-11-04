@@ -20,6 +20,16 @@ const BASE64 = /^[A-Za-z0-9+/=]+$/;
 
 export const configured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 
+// Direct REST fetch — bypasses the Supabase SDK for read-only queries. Same as the desktop app's
+// Community.Query: one fetch with the apikey header, no SDK download/parse/init overhead.
+export function restQuery(pathAndQuery) {
+  if (!configured) return Promise.reject(new Error("The gallery isn't connected to its database yet."));
+  const headers = { "apikey": SUPABASE_ANON_KEY };
+  if (SUPABASE_ANON_KEY.startsWith("eyJ")) headers["Authorization"] = "Bearer " + SUPABASE_ANON_KEY;
+  return fetch(SUPABASE_URL.replace(/\/$/, "") + "/rest/v1/" + pathAndQuery, { headers })
+    .then(r => { if (!r.ok) throw new Error(r.status + " " + r.statusText); return r.json(); });
+}
+
 // One client per page, even when the nav and the page ask at the same time (two would both try to
 // read an invite link's session from the address).
 let client;
