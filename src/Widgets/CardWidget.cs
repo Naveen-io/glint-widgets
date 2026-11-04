@@ -66,8 +66,22 @@ namespace DeskWidgets.Widgets
         protected Palette Pal { get { return IsVibrant ? VibrantPalette : Face == "light" ? LightPalette : DarkPalette; } }
         protected float Zoom { get { return Dpi * Settings.GetInt("scale", 100) / 100f; } }
         protected float P(float pt) { return pt * Zoom; }
-        protected float W { get { return P(size == CardSize.Small ? 170 : 364); } }
-        protected float H { get { return P(size == CardSize.Large ? 382 : 170); } }
+        protected float W
+        {
+            get
+            {
+                int cw = Settings.GetInt("custom_w", 0);
+                return cw > 0 ? cw : P(size == CardSize.Small ? 170 : 364);
+            }
+        }
+        protected float H
+        {
+            get
+            {
+                int ch = Settings.GetInt("custom_h", 0);
+                return ch > 0 ? ch : P(size == CardSize.Large ? 382 : 170);
+            }
+        }
 
         protected override Size Measure()
         {
@@ -101,7 +115,7 @@ namespace DeskWidgets.Widgets
 
         void DrawFrosted(Graphics g, GraphicsPath card)
         {
-            Size size = Measure();
+            Size size = new Size((int)Math.Round(W), (int)Math.Round(H));
             // Library previews have no place on screen yet: they get a neutral stand-in.
             Rectangle where = IsHandleCreated ? new Rectangle(Location, size) : Rectangle.Empty;
             if (backdrop == null || where != backdropFor || backdrop.Size != size)
