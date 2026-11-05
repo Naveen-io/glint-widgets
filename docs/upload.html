@@ -267,7 +267,7 @@
         sourceErr.textContent = "";
         if (!/\.cs$/i.test(file.name)) { sourceErr.textContent = "That isn't a .cs file."; refresh(); return; }
         if (file.size > MAX_SOURCE) { sourceErr.textContent = "That file is " + kb(file.size) + ". The limit is 512 KB."; refresh(); return; }
-        sourceText = (await file.text()).replace(/^﻿/, "");
+        sourceText = (await file.text()).replace(/^\uFEFF/, "");
         sourceName = file.name;
         sourceErr.textContent = checkSource(sourceText);
         showFile();
@@ -278,7 +278,7 @@
       for (const type of ["dragleave", "drop"]) drop.addEventListener(type, () => drop.classList.remove("hot"));
       drop.addEventListener("drop", (e) => { e.preventDefault(); if (e.dataTransfer.files[0]) takeFile(e.dataTransfer.files[0]); });
       sourceArea.addEventListener("input", () => {
-        sourceText = sourceArea.value.replace(/^﻿/, "");
+        sourceText = sourceArea.value.replace(/^\uFEFF/, "");
         sourceErr.textContent = sourceText.trim() ? checkSource(sourceText) : "";
         refresh();
       });
@@ -289,7 +289,7 @@
         drop.hidden = pasteMode || !fileRow.hidden;
         fileRow.hidden = pasteMode || !sourceName;
         // Only the active mode is submitted.
-        sourceText = pasteMode ? sourceArea.value.replace(/^﻿/, "") : (sourceName ? sourceText : "");
+        sourceText = pasteMode ? sourceArea.value.replace(/^\uFEFF/, "") : (sourceName ? sourceText : "");
         sourceErr.textContent = sourceText.trim() ? checkSource(sourceText) : "";
         refresh();
       });
@@ -389,7 +389,7 @@
         submit.replaceChildren(el("span", { class: "spinner" }), " Sending…");
         form.querySelectorAll("input, select, textarea").forEach((f) => { f.disabled = true; });
 
-        const text = sourceText.replace(/^﻿/, "");
+        const text = sourceText.replace(/^\uFEFF/, "");
         const problem = checkSource(text);
         if (problem) return fail(problem);
 

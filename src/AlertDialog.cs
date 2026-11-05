@@ -134,9 +134,9 @@ namespace DeskWidgets
         }
 
         // An app update is available: Later is the default, Install is blue.
-        public static bool ConfirmUpdate(string title, string message)
+        public static bool ConfirmUpdate(string title, string message, IList<KeyValuePair<string, string>> facts)
         {
-            return Run(title, message, null, null, null, new[] { "Later", "Install" },
+            return Run(title, message, facts, null, null, new[] { "Later", "Install" },
                 new[] { ButtonStyle.Grey, ButtonStyle.Primary }, 0, 0) == 1;
         }
 

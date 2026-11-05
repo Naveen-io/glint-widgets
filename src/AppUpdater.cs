@@ -10,88 +10,116 @@ namespace DeskWidgets
 {
     static class AppUpdater
     {
-        internal const string AppVersion = "1.0.0";
+        internal const string AppVersion = "1.8.1";
         const string RepoOwner = "whoissaaif";
         const string RepoName = "desk-widgets";
         const string ApiUrl = "https://api.github.com/repos/" + RepoOwner + "/" + RepoName + "/releases/latest";
         const string ExeName = "DeskWidgets.exe";
 
+        static string foundVersion, foundNotes, foundUrl;
+
         public static void CheckInBackground()
         {
-            ThreadPool.QueueUserWorkItem(delegate { Check(); });
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                if (FindUpdate())
+                {
+                    string ver = foundVersion, notes = foundNotes, url = foundUrl;
+                    App.RunOnUi(delegate { ShowUpdateDialog(ver, notes, url); });
+                }
+            });
         }
 
-        static void Check()
+        public static void CheckManual(Action<bool> onComplete)
         {
-            try
+            ThreadPool.QueueUserWorkItem(delegate
             {
-                string json = Http.Get(ApiUrl);
-                var jss = new System.Web.Script.Serialization.JavaScriptSerializer();
-                var obj = jss.DeserializeObject(json) as Dictionary<string, object>;
-                if (obj == null) return;
+                bool found = false;
+                try { found = FindUpdate(); }
+                catch (Exception) { }
+                App.RunOnUi(delegate { onComplete(found); });
+            });
+        }
 
-                object tagObj;
-                if (!obj.TryGetValue("tag_name", out tagObj)) return;
-                string tag = tagObj as string;
-                if (tag == null) return;
-                if (tag.StartsWith("v", StringComparison.OrdinalIgnoreCase)) tag = tag.Substring(1);
+        public static void PromptInstall()
+        {
+            if (foundVersion == null || foundUrl == null) return;
+            ShowUpdateDialog(foundVersion, foundNotes ?? "", foundUrl);
+        }
 
-                Version remote;
-                Version current;
-                if (!Version.TryParse(tag, out remote)) return;
-                if (!Version.TryParse(AppVersion, out current)) return;
-                if (remote <= current) return;
+        static bool FindUpdate()
+        {
+            string json = Http.Get(ApiUrl);
+            var jss = new System.Web.Script.Serialization.JavaScriptSerializer();
+            var obj = jss.DeserializeObject(json) as Dictionary<string, object>;
+            if (obj == null) return false;
 
-                string downloadUrl = null;
-                object assetsObj;
-                if (obj.TryGetValue("assets", out assetsObj))
+            object tagObj;
+            if (!obj.TryGetValue("tag_name", out tagObj)) return false;
+            string tag = tagObj as string;
+            if (tag == null) return false;
+            if (tag.StartsWith("v", StringComparison.OrdinalIgnoreCase)) tag = tag.Substring(1);
+
+            Version remote;
+            Version current;
+            if (!Version.TryParse(tag, out remote)) return false;
+            if (!Version.TryParse(AppVersion, out current)) return false;
+            if (remote <= current) return false;
+
+            string downloadUrl = null;
+            object assetsObj;
+            if (obj.TryGetValue("assets", out assetsObj))
+            {
+                var assets = assetsObj as object[];
+                if (assets != null)
                 {
-                    var assets = assetsObj as object[];
-                    if (assets != null)
+                    foreach (object a in assets)
                     {
-                        foreach (object a in assets)
+                        var asset = a as Dictionary<string, object>;
+                        if (asset == null) continue;
+                        object nameObj;
+                        if (asset.TryGetValue("name", out nameObj) &&
+                            string.Equals(nameObj as string, ExeName, StringComparison.OrdinalIgnoreCase))
                         {
-                            var asset = a as Dictionary<string, object>;
-                            if (asset == null) continue;
-                            object nameObj;
-                            if (asset.TryGetValue("name", out nameObj) &&
-                                string.Equals(nameObj as string, ExeName, StringComparison.OrdinalIgnoreCase))
-                            {
-                                object urlObj;
-                                if (asset.TryGetValue("browser_download_url", out urlObj))
-                                    downloadUrl = urlObj as string;
-                                break;
-                            }
+                            object urlObj;
+                            if (asset.TryGetValue("browser_download_url", out urlObj))
+                                downloadUrl = urlObj as string;
+                            break;
                         }
                     }
                 }
-
-                if (downloadUrl == null)
-                    downloadUrl = "https://github.com/" + RepoOwner + "/" + RepoName + "/releases/latest/download/" + ExeName;
-
-                string releaseNotes = "";
-                object bodyObj;
-                if (obj.TryGetValue("body", out bodyObj) && bodyObj is string)
-                {
-                    releaseNotes = ((string)bodyObj).Trim();
-                    if (releaseNotes.Length > 300)
-                        releaseNotes = releaseNotes.Substring(0, 297) + "...";
-                }
-
-                string url = downloadUrl;
-                App.RunOnUi(delegate { ShowUpdateDialog(tag, releaseNotes, url); });
             }
-            catch (Exception) { }
+
+            if (downloadUrl == null)
+                downloadUrl = "https://github.com/" + RepoOwner + "/" + RepoName + "/releases/latest/download/" + ExeName;
+
+            string releaseNotes = "";
+            object bodyObj;
+            if (obj.TryGetValue("body", out bodyObj) && bodyObj is string)
+            {
+                releaseNotes = ((string)bodyObj).Trim();
+                if (releaseNotes.Length > 300)
+                    releaseNotes = releaseNotes.Substring(0, 297) + "...";
+            }
+
+            foundVersion = tag;
+            foundNotes = releaseNotes;
+            foundUrl = downloadUrl;
+            return true;
         }
 
         static void ShowUpdateDialog(string version, string notes, string downloadUrl)
         {
-            string message = "Version " + version + " is available (you have " + AppVersion + ").";
+            string message = "A newer version of Desk Widgets is ready to install.";
             if (notes.Length > 0) message += "\n\n" + notes;
 
-            bool install = AlertDialog.ConfirmUpdate(
-                "An Update Is Available",
-                message);
+            var facts = new[]
+            {
+                new KeyValuePair<string, string>("Installed", AppVersion),
+                new KeyValuePair<string, string>("Latest", version)
+            };
+
+            bool install = AlertDialog.ConfirmUpdate("An Update Is Available", message, facts);
             if (install) DownloadAndInstall(downloadUrl);
         }
 

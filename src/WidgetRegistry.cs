@@ -51,6 +51,13 @@ namespace DeskWidgets
             new WidgetCategory { Id = "media", Name = "Media", Description = "Your pictures and what's playing", Glyph = '\uEB9F' },
             new WidgetCategory { Id = "developer", Name = "Developer", Description = "Your GitHub at a glance", Glyph = '\uE943' },
             new WidgetCategory { Id = "sports", Name = "Sports", Description = "Formula 1 schedule, standings and timing", Glyph = '\uE7C1' },
+            new WidgetCategory { Id = "finance", Name = "Finance", Description = "Stocks, crypto and currency rates", Glyph = '\uE825' },
+            new WidgetCategory { Id = "news", Name = "News", Description = "Headlines and RSS feeds", Glyph = '\uE783' },
+            new WidgetCategory { Id = "utility", Name = "Utility", Description = "Calculators, converters and quick tools", Glyph = '\uE90F' },
+            new WidgetCategory { Id = "social", Name = "Social", Description = "Followers, messages and feeds", Glyph = '\uE716' },
+            new WidgetCategory { Id = "health", Name = "Health", Description = "Steps, hydration and wellness", Glyph = '\uE95E' },
+            new WidgetCategory { Id = "travel", Name = "Travel", Description = "Flights, transit and trip info", Glyph = '\uE709' },
+            new WidgetCategory { Id = "games", Name = "Games", Description = "Mini games and fun widgets", Glyph = '\uE7FC' },
         };
 
         static readonly WidgetType[] BuiltIn =

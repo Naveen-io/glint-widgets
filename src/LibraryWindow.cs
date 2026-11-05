@@ -39,6 +39,9 @@ namespace DeskWidgets
         SidebarItem startupToggle, highPriorityToggle;
         Label settingsAppearanceLabel;
         SidebarItem[] themeItems;
+        Label updateLabel, updateStatus;
+        PillButton updateInstall;
+        RefreshButton updateRefresh;
         PillButton uninstallButton;
         string page; // category id, InstalledPage, SettingsPage, or null for all widgets
 
@@ -251,6 +254,10 @@ namespace DeskWidgets
             startupToggle.Visible = settingsOpen;
             highPriorityToggle.Visible = settingsOpen;
             settingsAppearanceLabel.Visible = settingsOpen;
+            updateLabel.Visible = settingsOpen;
+            updateRefresh.Visible = settingsOpen;
+            updateStatus.Visible = settingsOpen && updateStatus.Visible;
+            updateInstall.Visible = settingsOpen && updateInstall.Visible;
             uninstallButton.Visible = settingsOpen;
             foreach (var t in themeItems) t.Visible = settingsOpen;
             if (settingsOpen) y = LayoutSettings(pad, width, y);
@@ -333,8 +340,8 @@ namespace DeskWidgets
             {
                 bool on = !startupToggle.On;
                 try { App.StartWithWindows = on; }
-                catch (Exception) { on = startupToggle.On; }
-                startupToggle.On = on;
+                catch (Exception) { }
+                startupToggle.On = App.StartWithWindows;
                 startupToggle.Invalidate();
             };
             content.Controls.Add(startupToggle);
@@ -374,6 +381,35 @@ namespace DeskWidgets
                 themeItems[i] = item;
             }
 
+            updateLabel = new Label { Text = "Check for Updates", Font = Theme.Body, ForeColor = Theme.Label, AutoSize = true };
+            content.Controls.Add(updateLabel);
+
+            updateStatus = new Label { Font = Theme.Footnote, ForeColor = Theme.Label2, AutoSize = true, Visible = false };
+            content.Controls.Add(updateStatus);
+
+            updateInstall = new PillButton("Install", ButtonStyle.Primary) { Visible = false };
+            updateInstall.Click += delegate { AppUpdater.PromptInstall(); };
+            content.Controls.Add(updateInstall);
+
+            updateRefresh = new RefreshButton();
+            updateRefresh.Click += delegate
+            {
+                if (updateRefresh.Spinning) return;
+                updateStatus.Visible = false;
+                updateInstall.Visible = false;
+                updateRefresh.StartSpin();
+                AppUpdater.CheckManual(delegate(bool found)
+                {
+                    updateRefresh.StopSpin();
+                    updateStatus.Text = found ? "Update available" : "Up to date";
+                    updateStatus.ForeColor = found ? Theme.Label : Color.FromArgb(52, 199, 89);
+                    updateStatus.Visible = true;
+                    updateInstall.Visible = found;
+                    LayoutContent();
+                });
+            };
+            content.Controls.Add(updateRefresh);
+
             uninstallButton = new PillButton("Uninstall Desk Widgets", ButtonStyle.Destructive);
             uninstallButton.Click += delegate { App.Current.UninstallApp(); };
             content.Controls.Add(uninstallButton);
@@ -396,6 +432,19 @@ namespace DeskWidgets
                 y += Px(38);
             }
             y += Px(24);
+
+            int midY = y + (Px(32) - updateLabel.Height) / 2;
+            updateLabel.Location = new Point(pad, midY);
+            updateRefresh.Location = new Point(pad + rowW - updateRefresh.Width, y);
+            int right = updateRefresh.Left - Px(8);
+            if (updateInstall.Visible)
+            {
+                updateInstall.Location = new Point(right - updateInstall.Width, y + (Px(32) - updateInstall.Height) / 2);
+                right = updateInstall.Left - Px(8);
+            }
+            if (updateStatus.Visible)
+                updateStatus.Location = new Point(right - updateStatus.PreferredWidth, midY);
+            y += Px(44);
 
             uninstallButton.Location = new Point(pad, y);
             y += uninstallButton.Height + Px(16);
@@ -515,6 +564,7 @@ namespace DeskWidgets
             Theme.ApplyToWindow(Handle);
             Theme.ApplyToScrollbars(content.Handle);
             settingsAppearanceLabel.ForeColor = Theme.Label2;
+            updateLabel.ForeColor = Theme.Label;
             BuildNav();
             ShowPage(page);
             foreach (Control c in content.Controls) c.Invalidate();
@@ -729,6 +779,44 @@ namespace DeskWidgets
 
         protected override void OnMouseEnter(EventArgs e) { AnimateHover(true); base.OnMouseEnter(e); }
         protected override void OnMouseLeave(EventArgs e) { AnimateHover(false); base.OnMouseLeave(e); }
+    }
+
+    sealed class RefreshButton : PaintedControl
+    {
+        float angle;
+        readonly Timer spin = new Timer { Interval = 16 };
+
+        public RefreshButton()
+        {
+            Size = new Size(Px(32), Px(32));
+            Cursor = Cursors.Hand;
+            spin.Tick += delegate { angle = (angle + 8f) % 360f; Invalidate(); };
+        }
+
+        public bool Spinning { get { return spin.Enabled; } }
+        public void StartSpin() { spin.Start(); }
+        public void StopSpin() { spin.Stop(); angle = 0; Invalidate(); }
+
+        protected override void Draw(Graphics g)
+        {
+            Color color = Theme.Blend(Theme.Label2, Theme.Link, HoverBlend);
+            var state = g.Save();
+            g.TranslateTransform(Width / 2f, Height / 2f);
+            if (spin.Enabled) g.RotateTransform(angle);
+            using (var brush = new SolidBrush(color))
+            using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                g.DrawString("", Theme.Icons, brush, 0, 0, sf);
+            g.Restore(state);
+        }
+
+        protected override void OnMouseEnter(EventArgs e) { AnimateHover(true); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { AnimateHover(false); base.OnMouseLeave(e); }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) spin.Dispose();
+            base.Dispose(disposing);
+        }
     }
 
     // One row of a grouped inset list on the Installed page: a widget that was turned off (Try Again)
@@ -1016,6 +1104,20 @@ namespace DeskWidgets
             if (plugin != null)
             {
                 menu.Add("Show Source", delegate { AlertDialog.ShowSource(Plugins.DisplayName(plugin), plugin.SourcePath); });
+                menu.Add("Save Preview", delegate
+                {
+                    using (var dlg = new SaveFileDialog())
+                    {
+                        dlg.Title = "Save Preview";
+                        dlg.Filter = "PNG image (*.png)|*.png";
+                        dlg.FileName = (plugin.Name ?? plugin.Id) + ".png";
+                        if (dlg.ShowDialog() != DialogResult.OK) return;
+                        byte[] png = UploadDialog.PreviewOf(type);
+                        if (png == null) return;
+                        try { System.IO.File.WriteAllBytes(dlg.FileName, png); }
+                        catch (Exception ex) { AlertDialog.Show("The preview couldn't be saved.", ex.Message); }
+                    }
+                });
                 if (plugin.Author == "local") menu.Add("Upload to the Gallery…", delegate { App.UploadWidget(plugin); });
                 menu.AddSeparator();
                 menu.AddDestructive("Uninstall…", delegate { App.ConfirmUninstall(plugin); });
