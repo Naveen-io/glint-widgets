@@ -7,103 +7,218 @@
   <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
-  <main class="content section narrow">
-    <h1 class="t-section">Sign in.</h1>
-    <p class="t-intro">Use the username and password you chose when you accepted your invite.</p>
-    <div id="page" style="margin-top: 40px"></div>
+  <main class="auth">
+    <div class="auth-col" id="page"></div>
   </main>
 
   <script type="module">
     import { nav, el, notice, supabase, configured, me, toast } from "./assets/site.js";
     import { signInWithPassword } from "./assets/account.js";
+    import { usingStub, stubbed } from "./assets/data.js";
 
-    nav("login");
+    nav("login", { signedOut: usingStub });   // with the stub nobody is signed in on this page
     const page = document.getElementById("page");
     // Only pages on this site, never another origin.
     const raw = new URLSearchParams(location.search).get("next") || "";
     const next = "index.html";
+    const METHOD_KEY = "dw-signin-method";
+    // TODO: Supabase's default one-time-link expiry is 60 minutes; the project exposes no config
+    // value to read it from, so this is the default rather than a looked-up number.
+    const LINK_MINUTES = 60;
+
+    const icon = (paths, size) => {
+      const ns = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("width", String(size));
+      svg.setAttribute("height", String(size));
+      svg.setAttribute("class", "ico");
+      svg.setAttribute("aria-hidden", "true");
+      for (const d of paths) {
+        const path = document.createElementNS(ns, "path");
+        path.setAttribute("d", d);
+        svg.appendChild(path);
+      }
+      return svg;
+    };
+    const ICON = {
+      alert: ["M12 3.5 1.5 21h21L12 3.5z", "M12 10v4.5M12 17.5h.01"],
+      eye: ["M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12z", "M12 9.25a2.75 2.75 0 1 0 0 5.5 2.75 2.75 0 0 0 0-5.5z"],
+      eyeOff: ["M4 4l16 16", "M9.9 5.1A9.6 9.6 0 0 1 12 4.9c6 0 9.5 5.5 9.5 5.5a15 15 0 0 1-3.2 3.6M6.5 7.2A15 15 0 0 0 2.5 10.4S6 15.9 12 15.9c1 0 1.9-.2 2.7-.4"],
+      mail: ["M3 6.5h18v11H3z", "M3 7l9 6 9-6"],
+    };
+    const stored = (key) => { try { return localStorage.getItem(key); } catch (e) { return null; } };
+    const store = (key, value) => { try { localStorage.setItem(key, value); } catch (e) { /* no storage */ } };
 
     async function main() {
-      if (!configured) { page.replaceChildren(notice("Accounts aren't connected yet.")); return; }
-      const already = await me();
+      if (!configured && !usingStub) { page.replaceChildren(notice("Accounts aren't connected yet.")); return; }
+      const already = usingStub ? null : await me();
       if (already && already.profile) {
         page.replaceChildren(notice("You're signed in as " + already.profile.username + "."),
           el("div", { class: "actions" }, el("a", { class: "button", href: next }, "Continue")));
         return;
       }
 
+      // ---------- header and the method switch ----------
+      const tabPassword = el("button", { type: "button", class: "seg-tab", id: "tab-password", role: "tab",
+        "aria-selected": "true", "aria-controls": "panel" }, "Password");
+      const tabLink = el("button", { type: "button", class: "seg-tab", id: "tab-link", role: "tab",
+        "aria-selected": "false", "aria-controls": "panel" }, "Email link");
+      const tabs = el("div", { class: "seg auth-seg", role: "tablist", "aria-label": "Sign-in method" }, tabPassword, tabLink);
+      const panel = el("div", { id: "panel", class: "auth-panel", role: "tabpanel" });
+
+      // ---------- password ----------
+      const errorBanner = el("div", { class: "auth-err", role: "alert", hidden: true });
       const username = el("input", { class: "input", id: "username", autocomplete: "username", required: true,
         autocapitalize: "none", spellcheck: "false", maxlength: "24" });
-      const password = el("input", { class: "input", id: "password", type: "password", autocomplete: "current-password", required: true });
-      const result = el("div");
-      const button = el("button", { class: "button", type: "submit" }, "Sign In");
-      const form = el("form", { class: "form", onsubmit: async e => {
+      const password = el("input", { class: "input pw", id: "password", type: "password",
+        autocomplete: "current-password", required: true });
+      const reveal = el("button", { type: "button", class: "pw-toggle", "aria-label": "Show password",
+        "aria-pressed": "false", onclick: () => {
+          const shown = password.type === "text";
+          password.type = shown ? "password" : "text";
+          reveal.setAttribute("aria-pressed", String(!shown));
+          reveal.setAttribute("aria-label", shown ? "Show password" : "Hide password");
+          reveal.replaceChildren(icon(shown ? ICON.eye : ICON.eyeOff, 20));
+          password.focus();
+        } }, icon(ICON.eye, 20));
+      const signInButton = el("button", { class: "button auth-submit", type: "submit" }, "Sign In");
+
+      function showError() {
+        errorBanner.replaceChildren(icon(ICON.alert, 16),
+          el("span", {}, "That username and password don't match. Try again, or ",
+            el("button", { type: "button", class: "up-link", onclick: () => selectTab(true) }, "use an email link"), "."));
+        errorBanner.hidden = false;
+      }
+
+      const passwordForm = el("form", { class: "auth-form", onsubmit: async (e) => {
           e.preventDefault();
-          button.disabled = true;
-          result.replaceChildren();
-          const error = await signInWithPassword(username.value.trim().toLowerCase(), password.value);
-          button.disabled = false;
-          if (error) { result.replaceChildren(notice(error, true)); password.select(); return; }
-          toast("Signed in as " + username.value.trim().toLowerCase() + ".", true);
+          errorBanner.hidden = true;
+          signInButton.disabled = true;
+          signInButton.replaceChildren(el("span", { class: "spinner" }), " Signing in…");
+          username.disabled = password.disabled = reveal.disabled = true;
+          const who = username.value.trim().toLowerCase();
+          // The stub stands in only while the database is not connected; the call below is the
+          // real one, unchanged.
+          const error = usingStub
+            ? (await stubbed(), password.value === "wrong" ? "That username and password don't match." : null)
+            : await signInWithPassword(who, password.value);
+          signInButton.disabled = false;
+          signInButton.replaceChildren("Sign In");
+          username.disabled = password.disabled = reveal.disabled = false;
+          if (error) { showError(); password.select(); return; }
+          toast("Signed in as " + who + ".", true);
           location.href = next;
         } },
+        errorBanner,
         el("div", { class: "field" }, el("label", { for: "username" }, "Username"), username),
-        el("div", { class: "field" }, el("label", { for: "password" }, "Password"), password),
-        el("div", {}, button),
-        result);
+        el("div", { class: "field" },
+          el("div", { class: "up-row-label" }, el("label", { for: "password" }, "Password"),
+            el("a", { class: "auth-forgot", href: "#forgot", onclick: (e) => { e.preventDefault(); showReset(); } },
+              "Forgot password?")),
+          el("div", { class: "pw-wrap" }, password, reveal)),
+        signInButton);
 
+      // ---------- one email form, used for the sign-in link and for the password reset ----------
       // Two different emails, two different pages (Supabase sends each with its own template):
-      // "Email me a sign-in link" signs in without a password and comes back to `next`;
-      // "Forgot your password" sends a "Change your password" email that opens password.html.
-      // Sign-ups are off, so unknown addresses get nothing, and the answer is the same either way.
-      function emailForm(id, label, hint, buttonText, send, sent) {
-        const email = el("input", { class: "input", type: "email", id, autocomplete: "email", required: true });
-        const answer = el("div");
-        const submit = el("button", { class: "button grey", type: "submit" }, buttonText);
-        const form = el("form", { class: "form reveal", onsubmit: async e => {
+      // the sign-in link signs in without a password and comes back to `next`; "Forgot password?"
+      // sends a "Change your password" email that opens password.html. Sign-ups are off, so
+      // unknown addresses get nothing, and the answer is the same either way.
+      const here = new URL(next, location.href).href;
+      const sendLink = (db, address) =>
+        db.auth.signInWithOtp({ email: address, options: { shouldCreateUser: false, emailRedirectTo: here } });
+      const sendReset = (db, address) =>
+        db.auth.resetPasswordForEmail(address, { redirectTo: new URL("password.html", location.href).href });
+
+      function emailMethod({ id, buttonText, send, heading, sentLine, back }) {
+        const email = el("input", { class: "input", type: "email", id, autocomplete: "email", required: true,
+          placeholder: "you@example.com", "aria-describedby": id + "-hint" });
+        const button = el("button", { class: "button auth-submit", type: "submit" }, buttonText);
+        const form = el("form", { class: "auth-form", onsubmit: async (e) => {
             e.preventDefault();
-            submit.disabled = true;
-            const db = await supabase();
-            const { error } = await send(db, email.value.trim());
-            submit.disabled = false;
-            // Too many emails in a short time is the one failure worth showing; the rest look like success.
-            answer.replaceChildren(error && /rate limit|too many/i.test(error.message)
-              ? notice("Too many emails were sent just now. Wait a few minutes, then try again.", true)
-              : notice(sent));
+            button.disabled = true;
+            button.replaceChildren(el("span", { class: "spinner" }), " Sending…");
+            email.disabled = true;
+            let rateLimited = false;
+            if (usingStub) await stubbed();
+            else {
+              const db = await supabase();
+              const { error } = await send(db, email.value.trim());
+              // Too many emails in a short time is the one failure worth showing; the rest look
+              // like success, so which addresses have accounts stays private.
+              rateLimited = Boolean(error && /rate limit|too many/i.test(error.message));
+            }
+            button.disabled = false;
+            button.replaceChildren(buttonText);
+            email.disabled = false;
+            if (rateLimited) {
+              panel.prepend(notice("Too many emails were sent just now. Wait a few minutes, then try again.", true));
+              return;
+            }
+            showInbox(() => { panel.replaceChildren(form); email.value = ""; email.focus(); }, back);
           } },
-          el("h2", { class: "t-headline" }, label),
-          el("div", { class: "field" }, el("label", { for: id }, "Email"), email, el("span", { class: "hint" }, hint)),
-          el("div", {}, submit),
-          answer);
-        form.open = () => { form.classList.add("open"); email.focus(); };
+          el("div", { class: "field" }, el("label", { for: id }, "Email"), email,
+            el("span", { class: "hint", id: id + "-hint" }, "The address your invite was sent to.")),
+          button);
+        form.focusFirst = () => email.focus();
+        if (heading) form.prepend(el("h2", { class: "auth-heading" }, heading));
+        form.sentLine = sentLine;
         return form;
       }
-      const here = new URL(next, location.href).href;
-      const linkForm = emailForm("link-email", "Sign in with an email link.", "The address your invite was sent to.",
-        "Email Me a Sign-In Link",
-        (db, address) => db.auth.signInWithOtp({ email: address, options: { shouldCreateUser: false, emailRedirectTo: here } }),
-        "If that address has an account, a sign-in link is on its way. It works once, for an hour.");
-      const forgotForm = emailForm("reset-email", "Change your password.", "The address your invite was sent to.",
-        "Email Me a Password Link",
-        (db, address) => db.auth.resetPasswordForEmail(address, { redirectTo: new URL("password.html", location.href).href }),
-        "If that address has an account, an email to change your password is on its way. It works once, for an hour.");
-      const show = form => e => {
-        e.preventDefault();
-        (form === linkForm ? forgotForm : linkForm).classList.remove("open");
-        form.open();
-      };
 
-      page.replaceChildren(form,
-        el("p", { class: "t-reduced", style: "margin-top: 32px" },
-          el("a", { href: "#forgot", class: "more", onclick: show(forgotForm) }, "Forgot your password"),
-          el("br"),
-          el("a", { href: "#link", class: "more", onclick: show(linkForm) }, "Sign in with an email link instead"),
-          el("br"),
-          "No account? Uploading is by invitation. ", el("a", { class: "more", href: "upload.html#request" }, "Request access")),
-        forgotForm, linkForm);
-      if (location.hash === "#forgot") { forgotForm.open(); return; }
-      if (location.hash === "#link") { linkForm.open(); return; }
-      username.focus();
+      const linkForm = emailMethod({
+        id: "link-email", buttonText: "Email Me a Sign-In Link", send: sendLink,
+        back: "Use a different email",
+      });
+      const resetForm = emailMethod({
+        id: "reset-email", buttonText: "Email Me a Password Link", send: sendReset,
+        heading: "Change your password.", back: "Back to sign in",
+      });
+
+      function showInbox(again, backText) {
+        panel.replaceChildren(el("div", { class: "inbox", role: "status" },
+          el("span", { class: "inbox-icon" }, icon(ICON.mail, 24)),
+          el("h2", {}, "Check your inbox."),
+          el("p", {}, "If an invite was sent to that address, a sign-in link is on its way. " +
+            "It works once and expires in " + LINK_MINUTES + " minutes."),
+          el("button", { type: "button", class: "up-link", onclick: backText === "Back to sign in"
+            ? () => selectTab(false) : again }, backText)));
+      }
+
+      function showReset() {
+        tabPassword.setAttribute("aria-selected", "false");
+        tabLink.setAttribute("aria-selected", "false");
+        panel.replaceChildren(resetForm);
+        resetForm.focusFirst();
+      }
+
+      let first = true;
+      function selectTab(linkMethod) {
+        tabPassword.setAttribute("aria-selected", String(!linkMethod));
+        tabLink.setAttribute("aria-selected", String(linkMethod));
+        panel.replaceChildren(linkMethod ? linkForm : passwordForm);
+        store(METHOD_KEY, linkMethod ? "link" : "password");
+        // Focusing on a phone's first paint pops the keyboard up over the page.
+        const wide = window.matchMedia("(min-width: 700px)").matches;
+        if (!first || wide) {
+          if (linkMethod) linkForm.focusFirst();
+          else username.focus();
+        }
+        first = false;
+      }
+      tabPassword.addEventListener("click", () => selectTab(false));
+      tabLink.addEventListener("click", () => selectTab(true));
+
+      page.replaceChildren(
+        el("h1", { class: "auth-title" }, "Sign in."),
+        el("p", { class: "auth-sub" }, "Uploading is invite-only. Use the account from your invite."),
+        tabs,
+        panel,
+        el("p", { class: "auth-foot" }, "No account? Uploading is by invitation. ",
+          el("a", { class: "more", href: "upload.html#request" }, "Request access")));
+
+      if (location.hash === "#forgot") { showReset(); first = false; return; }
+      selectTab(location.hash === "#link" || stored(METHOD_KEY) === "link");
     }
     main().catch(() => page.replaceChildren(notice("This page couldn't load. Check your connection and reload.", true)));
   </script>

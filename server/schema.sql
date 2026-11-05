@@ -69,6 +69,10 @@ create table if not exists public.versions (
   check ((status = 'approved') = (sha256 is not null))
 );
 
+alter table public.versions drop constraint if exists versions_category_check;
+alter table public.versions add constraint versions_category_check
+  check (category in ('clocks', 'productivity', 'weather', 'system', 'media', 'developer', 'sports', 'finance', 'news', 'utility', 'social', 'health', 'travel', 'games'));
+
 -- ---------------------------------------------------------------- source must read as it compiles
 -- Characters that make code look different from what the C# compiler sees ("Trojan Source",
 -- CVE-2021-42574): line breaks only the compiler honors (lone CR, U+0085, U+2028, U+2029),
@@ -120,8 +124,6 @@ $$;
 drop trigger if exists versions_number on public.versions;
 create trigger versions_number before insert on public.versions
   for each row execute function public.next_version();
-
--- ---------------------------------------------------------------- indexes
 
 create index if not exists idx_versions_approved_latest
   on public.versions (widget_id, version desc) where status = 'approved';

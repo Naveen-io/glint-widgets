@@ -25,6 +25,15 @@ await db.exec(schema);
 await db.exec(schema); // re-runnable
 check('schema applies twice', true);
 
+await db.exec(`
+  alter table public.versions drop constraint versions_category_check;
+  alter table public.versions add constraint versions_category_check
+    check (category in ('clocks', 'productivity', 'weather', 'system', 'media', 'developer', 'sports'));
+  alter view public.authors set (security_invoker = true);
+  alter view public.explore set (security_invoker = true);
+`);
+await db.exec(schema);
+
 const U = { alice: '00000000-0000-0000-0000-00000000000a', bob: '00000000-0000-0000-0000-00000000000b',
             owner: '00000000-0000-0000-0000-00000000000c', eve: '00000000-0000-0000-0000-00000000000e' };
 for (const [n, id] of Object.entries(U)) await db.query(`insert into auth.users values ($1, $2)`, [id, n + '@x']);
@@ -201,6 +210,17 @@ r = await as('owner', `select public.reject_request($1)`, [reqId]);
 check('owner rejects a request', ok(r), r.error);
 r = await as('owner', `select public.reject_request($1)`, [reqId]);
 check('a decided request cannot be decided again', !ok(r), r.error);
+
+check('category upgrade test widget created', ok(await as('alice',
+  `insert into public.widgets (id, owner, slug) values ('u.alice.categories', $1, 'categories')`, [U.alice])));
+for (const category of ['finance', 'news', 'utility', 'social', 'health', 'travel', 'games']) {
+  r = await as('alice', `insert into public.versions (widget_id, name, category, source)
+    values ('u.alice.categories', 'Category', $1, 'class Category {}')`, [category]);
+  check('existing database accepts ' + category + ' after schema upgrade', ok(r), r.error);
+}
+r = await as('alice', `insert into public.versions (widget_id, name, category, source)
+  values ('u.alice.categories', 'Category', 'unknown', 'class Category {}')`);
+check('unknown category is still rejected', !ok(r) && /versions_category_check/.test(r.error), r.error);
 
 console.log(fails ? fails + ' FAILED' : 'all passed');
 process.exit(fails ? 1 : 0);

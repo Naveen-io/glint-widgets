@@ -10,8 +10,9 @@ which is why the website and the app can ship the public anon key.
    through `request_access()`; nobody but the owner can read it.
 2. The owner sees it under Access Requests on `admin.html`. **Accept** calls the `invite`
    function, which has Supabase email an invite; **Reject** just records it.
-3. The invite link opens `account.html` signed in. There the person picks a username (permanent,
-   part of their widget ids), a password, a bio and a photo. The profile row is what lets them upload.
+3. The invite link opens `account.html` signed in. There the person picks a username, a password,
+   a bio and a photo. The profile row is what lets them upload. Changing a username later keeps
+   existing widget ids unchanged.
 4. From then on they sign in with username and password on `login.html` or in the app. The
    `login` function looks up the email for the username (emails are never public) and returns a
    session. "Forgot your password" emails a one-time link back to `account.html`.
@@ -71,7 +72,26 @@ The website is served by GitHub Pages from `docs/` on `main`. On a free GitHub a
 serves public repositories, so the repo has to be public (or on GitHub Pro) before the site works,
 and release downloads are only reachable by visitors from a public repo.
 
-## Tests
+## Website release checks
+
+- Apply the current `schema.sql` in the project's SQL editor before publishing the website.
+  It updates the category constraint on existing databases, retains existing data, and restores
+  public reads through `authors` and `explore` even if those views used `security_invoker = true`.
+- Keep the deployed `invite` function from current `main`; this website rebuild does not require
+  replacing it with this older branch's function. `login` and `invite` must both be deployed.
+- Confirm the Site URL, redirect allow-list, and `SITE_URL` secret match the Pages URL above.
+- `http://localhost:8000/explore.html?live=1` checks real public gallery data. Without `live`,
+  localhost uses samples even when credentials are configured. Test real authentication on the
+  published Pages origin: the Edge Functions' CORS configuration allows that origin, and local
+  navigation drops the `live` query parameter.
+- On Pages, check username/password sign-in, email sign-in, password recovery, profile editing,
+  an upload, and deletion of that test upload. Check an existing username reports as taken.
+- Merge the website work into current `origin/main`, retaining its newer desktop, installer,
+  backend and gallery fixes. Resolve shared website changes in favor of the rebuilt layout while
+  retaining direct REST reads and independent gallery/profile loading. Include the new data and
+  hero-intro modules and `docs/assets/img/gmail-dark.png` in the release commit.
+
+## Database tests
 
 `test/schema.test.mjs` runs `schema.sql` in Postgres 16 (PGlite, no server needed) with a stub of
 Supabase's `auth` schema and its default grants, then makes 68 checks: who can read, insert and
