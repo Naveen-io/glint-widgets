@@ -7,161 +7,510 @@
   <link rel="stylesheet" href="assets/site.css">
 </head>
 <body>
-  <main class="content section">
-    <h1 class="t-section two-tone">Upload. <span class="tail">Send a widget for review.</span></h1>
-    <p class="t-intro">The owner reads every version before anyone can install it.</p>
-    <div id="page" style="margin-top: 40px">
-      <div class="form" aria-hidden="true">
-        <div class="field"><span class="text-skeleton heading"></span><span class="text-skeleton field"></span></div>
-        <div class="field"><span class="text-skeleton heading" style="width:30%"></span><span class="text-skeleton field"></span></div>
-        <div class="field"><span class="text-skeleton heading" style="width:35%"></span><span class="text-skeleton field"></span></div>
-        <div class="field"><span class="text-skeleton heading" style="width:25%"></span><span class="text-skeleton field" style="height:120px"></span></div>
-      </div>
+  <header class="up-head">
+    <h1 class="t-section">Upload.</h1>
+    <p>Send a widget for review. Every version is read by a person before anyone can install it.</p>
+  </header>
+  <main class="up-main" id="page">
+    <div class="up-form" aria-hidden="true">
+      <div class="field"><span class="text-skeleton heading"></span><span class="text-skeleton field"></span></div>
+      <div class="field"><span class="text-skeleton heading" style="width:30%"></span><span class="text-skeleton field"></span></div>
+      <div class="field"><span class="text-skeleton heading" style="width:35%"></span><span class="text-skeleton field" style="height:120px"></span></div>
     </div>
   </main>
 
   <script type="module">
-    import { nav, el, notice, supabase, configured, me, CATEGORIES, formatDate, hiddenCharacters, toast, confirmDialog } from "./assets/site.js";
+    import { nav, el, art, notice, CATEGORIES, categoryName, formatDate,
+      hiddenCharacters, toast, confirmDialog, widgetCard, REPO_URL } from "./assets/site.js";
+    // Every read and write goes through the data layer, so this page works the same against
+    // Supabase and against the sample rows used while it isn't connected.
+    import { available, getSession, getMyWidgets, getMyVersions, idTaken, createWidget,
+      createVersion, deleteWidget } from "./assets/data.js";
     import { requestAccessForm } from "./assets/account.js";
 
     nav("upload");
     const page = document.getElementById("page");
-    const MAX_SOURCE = 512 * 1024, MAX_PREVIEW = 100 * 1024;
+    const MAX_SOURCE = 512 * 1024;
+    const MAX_PREVIEW = 100 * 1024;
+    const MAX_PREVIEW_B64 = 140000;     // the versions.preview check in server/schema.sql
+    const MAX_SIDE = 1200;
+    const REVIEW_DAYS = null;           // TODO: no config value for review time anywhere in the repo
 
-    // Signed out: ask for access, or sign in.
+    // ---- small inline icons ----
+    const svg = (d, size) => {
+      const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      s.setAttribute("viewBox", "0 0 24 24");
+      s.setAttribute("width", size);
+      s.setAttribute("height", size);
+      s.setAttribute("aria-hidden", "true");
+      s.setAttribute("class", "ico");
+      for (const one of [].concat(d)) {
+        const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        p.setAttribute("d", one);
+        s.appendChild(p);
+      }
+      return s;
+    };
+    const ICON = {
+      lock: ["M5 10.5h14v10.5H5z", "M8.25 10.5V8a3.75 3.75 0 0 1 7.5 0v2.5"],
+      code: ["M9 8l-4 4 4 4M15 8l4 4-4 4"],
+      file: ["M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z", "M14 3v5h5"],
+      image: ["M3 5.5h18v13H3z", "M7 13l3-3 3 3 2-2 3 3"],
+      chev: ["M6 9.5l6 6 6-6"],
+      dots: ["M6 12h.01M12 12h.01M18 12h.01"],
+    };
+    const chevron = () => {
+      const s = svg(ICON.chev, 12);
+      s.setAttribute("class", "ico chev");
+      return s;
+    };
+    const selectWrap = (select) => el("span", { class: "up-sel" }, select, chevron());
+
+    const slugify = (text) => text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 36);
+    const kb = (bytes) => (bytes < 1024 ? bytes + " B" : Math.round(bytes / 1024) + " KB");
+
+    // ---- signed out ----
     function signedOut() {
       page.replaceChildren(
-        el("div", { class: "split" },
-          el("section", { id: "request" },
-            el("h2", { class: "t-card" }, "Request access."),
-            el("p", { class: "t-reduced" }, "Uploading is by invitation. Leave your email; if the owner accepts, you'll get an invite to set up your account."),
-            requestAccessForm()),
-          el("section", {},
-            el("h2", { class: "t-card" }, "Have an account?"),
-            el("p", { class: "t-reduced" }, "Sign in with your username and password."),
-            el("div", { class: "actions" }, el("a", { class: "button secondary", href: "login.html?next=upload.html" }, "Sign In")))));
+        el("div", { class: "up-wide", style: "text-align: center" },
+          el("p", { style: "font: 400 17px/24px var(--font-text); margin: 0 0 20px" },
+            "Sign in to send a widget for review."),
+          el("a", { class: "button", href: "login.html?next=upload.html" }, "Sign In")),
+        // Kept: this is the only route to an invitation, and the page is the only place it lives.
+        el("section", { class: "up-wide", id: "request", style: "max-width: 560px; margin: 24px auto 0" },
+          el("h2", { class: "up-label", style: "margin-bottom: 8px" }, "No account yet?"),
+          el("p", { class: "t-reduced", style: "margin: 0 0 16px" },
+            "Uploading is by invitation. Leave your email; if the owner accepts, you'll get an invite."),
+          requestAccessForm()));
       if (location.hash === "#request") document.getElementById("request-email").focus();
     }
 
+    // Trim the transparent (or uniform) border, add an even 4% back, cap at 1200px, re-encode PNG.
+    async function cleanPreview(file) {
+      const bitmap = await createImageBitmap(file);
+      const src = document.createElement("canvas");
+      src.width = bitmap.width;
+      src.height = bitmap.height;
+      const sctx = src.getContext("2d");
+      sctx.drawImage(bitmap, 0, 0);
+      const { data } = sctx.getImageData(0, 0, src.width, src.height);
+
+      let transparent = false;
+      for (let i = 3; i < data.length; i += 4) if (data[i] < 250) { transparent = true; break; }
+      const corner = [data[0], data[1], data[2]];
+      const keep = (x, y) => {
+        const i = (y * src.width + x) * 4;
+        if (transparent) return data[i + 3] >= 8;
+        return Math.abs(data[i] - corner[0]) > 6 || Math.abs(data[i + 1] - corner[1]) > 6 ||
+          Math.abs(data[i + 2] - corner[2]) > 6;
+      };
+      let x0 = src.width, y0 = src.height, x1 = -1, y1 = -1;
+      for (let y = 0; y < src.height; y++) {
+        for (let x = 0; x < src.width; x++) {
+          if (!keep(x, y)) continue;
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+      }
+      if (x1 < 0) { x0 = 0; y0 = 0; x1 = src.width - 1; y1 = src.height - 1; }   // nothing to trim
+      const w = x1 - x0 + 1, h = y1 - y0 + 1;
+      const pad = Math.round(Math.max(w, h) * 0.04);
+      const scale = Math.min(1, MAX_SIDE / Math.max(w + pad * 2, h + pad * 2));
+      const out = document.createElement("canvas");
+      out.width = Math.max(1, Math.round((w + pad * 2) * scale));
+      out.height = Math.max(1, Math.round((h + pad * 2) * scale));
+      const octx = out.getContext("2d");
+      octx.imageSmoothingEnabled = true;
+      octx.imageSmoothingQuality = "high";
+      octx.drawImage(src, x0, y0, w, h, Math.round(pad * scale), Math.round(pad * scale),
+        Math.round(w * scale), Math.round(h * scale));
+      const blob = await new Promise((done) => out.toBlob(done, "image/png"));
+      let binary = "";
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+      return { base64: btoa(binary), size: blob.size, width: out.width, height: out.height,
+        url: URL.createObjectURL(blob) };
+    }
+
     async function main() {
-      if (!configured) { page.replaceChildren(notice("Uploads aren't connected yet.")); return; }
-      const who = await me();
+      if (!available) { page.replaceChildren(notice("Uploads aren't connected yet.")); return; }
+      const who = await getSession();
       if (!who) return signedOut();
       if (!who.profile) { location.replace("account.html"); return; }
       const user = who.user, username = who.profile.username;
-      const db = await supabase();
-
-      const { data: mine } = await db.from("widgets").select("id, slug").eq("owner", user.id).order("id");
-      const { data: versions } = await db.from("versions").select("widget_id, version, name, status, created_at")
-        .order("created_at", { ascending: false });
-
-      // ---- the form ----
-      const which = el("select", { class: "input", id: "which" },
-        el("option", { value: "" }, "New widget…"), (mine || []).map(w => el("option", { value: w.id }, w.id)));
-      const slug = el("input", { class: "input", id: "slug", pattern: "[a-z0-9-]{1,36}", placeholder: "moon-phase" });
-      const idHint = el("span", { class: "hint" });
-      const slugField = el("div", { class: "field" }, el("label", { for: "slug" }, "Short Name"), slug, idHint);
-      const name = el("input", { class: "input", id: "name", maxlength: "40", required: true, placeholder: "Moon Phase" });
-      const category = el("select", { class: "input", id: "category" }, CATEGORIES.map(([id, n]) => el("option", { value: id }, n)));
-      const description = el("input", { class: "input", id: "description", maxlength: "120", placeholder: "Tonight's moon" });
-      const sourceFile = el("input", { type: "file", id: "sourceFile", accept: ".cs,text/plain" });
-      const source = el("textarea", { class: "input", id: "source", spellcheck: "false", required: true,
-        placeholder: "[DeskWidget(Name = \"Moon Phase\")]\npublic sealed class MoonPhase : WidgetWindow { ... }" });
-      const previewFile = el("input", { type: "file", id: "preview", accept: "image/png" });
-      const result = el("div");
-
-      const updateId = () => {
-        slugField.hidden = which.value !== "";
-        idHint.textContent = "Your widget's id will be u." + username + "." + (slug.value || "short-name") + ". It can't change later.";
-      };
-      which.addEventListener("change", updateId);
-      slug.addEventListener("input", updateId);
-      updateId();
-      sourceFile.addEventListener("change", async () => { if (sourceFile.files[0]) source.value = await sourceFile.files[0].text(); });
-
-      const form = el("form", { class: "form", onsubmit: async e => {
-          e.preventDefault();
-          const fail = text => result.replaceChildren(notice(text, true));
-          const text = source.value.replace(/^\uFEFF/, "");
-          if (new TextEncoder().encode(text).length > MAX_SOURCE) return fail("The source is larger than 512 KB.");
-          if (!/\[\s*DeskWidget\b/.test(text)) return fail("The source needs one class marked [DeskWidget].");
-          const hidden = hiddenCharacters(text);
-          if (hidden.length) return fail("The source contains a hidden character (" + hidden[0].code + " on line " + hidden[0].line +
-            ") that can make code look different from what runs. Remove it and try again.");
-          let preview = null;
-          const png = previewFile.files[0];
-          if (png) {
-            if (png.size > MAX_PREVIEW) return fail("The preview is larger than 100 KB.");
-            const bytes = new Uint8Array(await png.arrayBuffer());
-            if (bytes[0] !== 0x89 || bytes[1] !== 0x50) return fail("The preview must be a PNG image.");
-            let binary = "";
-            for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-            preview = btoa(binary);
-          }
-          let widgetId = which.value;
-          if (!widgetId) {
-            if (!/^[a-z0-9-]{1,36}$/.test(slug.value)) return fail("The short name can use lowercase letters, digits and hyphens.");
-            widgetId = "u." + username + "." + slug.value;
-            const { error } = await db.from("widgets").insert({ id: widgetId, owner: user.id, slug: slug.value });
-            if (error) return fail("That short name can't be used: " + error.message);
-          }
-          const { error } = await db.from("versions").insert({
-            widget_id: widgetId, name: name.value.trim(), category: category.value,
-            description: description.value.trim(), api_version: 1, source: text, preview,
-          });
-          if (error) return fail("It wasn't sent: " + error.message);
-          toast("Sent for review. It shows under Your Uploads as Pending until the owner approves it.", true);
-          location.reload();
-        } },
-        el("div", { class: "field" }, el("label", { for: "which" }, "Widget"), which,
-          el("span", { class: "hint" }, "Pick one of yours to send a new version, or start a new widget.")),
-        slugField,
-        el("div", { class: "field" }, el("label", { for: "name" }, "Name"), name),
-        el("div", { class: "field" }, el("label", { for: "category" }, "Category"), category),
-        el("div", { class: "field" }, el("label", { for: "description" }, "Description"), description,
-          el("span", { class: "hint" }, "One short line, shown under the name.")),
-        el("div", { class: "field" }, el("label", { for: "source" }, "C# Source"), sourceFile, source,
-          el("span", { class: "hint" }, "One file, up to 512 KB, with exactly one [DeskWidget] class. See samples/HelloWidget.cs.")),
-        el("div", { class: "field" }, el("label", { for: "preview" }, "Preview (optional)"), previewFile,
-          el("span", { class: "hint" }, "A PNG of the widget, up to 100 KB.")),
-        el("div", {}, el("button", { class: "button", type: "submit" }, "Send for Review")),
-        result);
-
-      // ---- your uploads: grouped by widget, with delete per widget ----
+      const [mine, versions] = await Promise.all([getMyWidgets(user.id), getMyVersions()]);
       const byWidget = {};
-      for (const v of versions || []) { (byWidget[v.widget_id] ||= []).push(v); }
+      for (const v of versions || []) (byWidget[v.widget_id] || (byWidget[v.widget_id] = [])).push(v);
+      const latest = (id) => (byWidget[id] || [])[0] || null;
 
-      const widgetSections = (mine || []).map(w => {
-        const vs = byWidget[w.id] || [];
-        const container = el("div", { style: "margin-bottom: 32px" });
-        const deleteBtn = el("button", { class: "button destructive small", type: "button", onclick: () => {
-          confirmDialog("Delete this widget?", w.id + " and all its versions will be permanently removed. This can't be undone.", "Delete Widget", async () => {
-            const { error } = await db.rpc("delete_widget", { p_widget: w.id });
-            if (error) { toast(error.message); return; }
-            container.remove();
-            toast("Deleted " + w.id + ".", true);
-            location.reload();
-          });
-        } }, "Delete Widget");
-        const rows = vs.length
-          ? el("div", { class: "group" }, vs.map(v => el("div", { class: "row" },
-              el("div", { class: "main" }, el("div", { class: "t-headline" }, v.name + " · Version " + v.version),
-                el("div", { class: "t-reduced" }, "sent " + formatDate(v.created_at))),
-              el("span", { class: "status " + v.status }, v.status))))
-          : el("p", { class: "t-reduced" }, "No versions sent yet.");
-        container.replaceChildren(
-          el("div", { style: "display: flex; align-items: center; gap: 12px; margin-bottom: 12px" },
-            el("div", { style: "flex: 1" }, el("div", { class: "t-headline" }, w.id)),
-            deleteBtn),
-          rows);
-        return container;
+      // ================= details =================
+      const which = el("select", { class: "input", id: "which" },
+        el("option", { value: "" }, "New widget"),
+        (mine || []).map((w) => {
+          const v = latest(w.id);
+          return el("option", { value: w.id }, (v ? v.name : w.id) + " — send a new version");
+        }));
+      const name = el("input", { class: "input", id: "name", maxlength: "40", required: true,
+        placeholder: "e.g. Moon Phase", autocomplete: "off" });
+      const category = el("select", { class: "input", id: "category", required: true },
+        el("option", { value: "" }, "Choose a category"),
+        CATEGORIES.map(([id, label]) => el("option", { value: id }, label)));
+      const description = el("input", { class: "input", id: "description", maxlength: "60",
+        placeholder: "e.g. Tonight's moon, at a glance" });
+      const descCount = el("span", { class: "up-count" }, "0 / 60");
+
+      // The id row: slug from the name unless it is edited by hand. Sent as "slug", as before.
+      let slugValue = "", slugEdited = false, slugError = "";
+      const idText = el("code");
+      const idEdit = el("button", { type: "button", class: "edit" }, "Edit");
+      const idInput = el("input", { "aria-label": "Widget id", maxlength: "36", hidden: true });
+      const idMsg = el("span", { class: "up-err", id: "id-error", role: "status" });
+      const idRow = el("div", { class: "up-id" }, svg(ICON.lock, 14), "ID ", idText, idInput,
+        el("span", {}, "· permanent once sent"), idEdit, idMsg);
+
+      const fullId = () => "u." + username + "." + (slugValue || "your-widget");
+      function paintId() {
+        idText.replaceChildren("u." + username + ".",
+          slugValue ? slugValue : el("span", { class: "dim" }, "your-widget"));
+        idText.hidden = !idInput.hidden;
+        idMsg.textContent = slugError;
+        idEdit.hidden = which.value !== "" || !idInput.hidden;
+      }
+      let checkTimer = 0;
+      function checkSlug() {
+        clearTimeout(checkTimer);
+        slugError = "";
+        if (which.value) { paintId(); return; }
+        if (slugValue && !/^[a-z0-9-]{1,36}$/.test(slugValue)) {
+          slugError = "Use lowercase letters, digits and hyphens.";
+          paintId();
+          return;
+        }
+        paintId();
+        if (!slugValue) return;
+        checkTimer = setTimeout(async () => {
+          const candidate = fullId();
+          const taken = await idTaken(candidate);
+          if (taken && slugValue && candidate === fullId()) {
+            slugError = "That id is already taken.";
+            paintId();
+          }
+        }, 300);
+      }
+      name.addEventListener("input", () => {
+        if (!slugEdited && !which.value) { slugValue = slugify(name.value); checkSlug(); }
+        refresh();
+      });
+      idEdit.addEventListener("click", () => {
+        idInput.value = slugValue;
+        idInput.hidden = false;
+        paintId();
+        idInput.focus();
+      });
+      idInput.addEventListener("input", () => { slugEdited = true; slugValue = slugify(idInput.value); checkSlug(); });
+      idInput.addEventListener("blur", () => { idInput.hidden = true; paintId(); refresh(); });
+      idInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); idInput.blur(); } });
+
+      // Picking one of mine locks name, id and category to that widget's latest version.
+      which.addEventListener("change", () => {
+        const v = latest(which.value);
+        if (which.value && v) {
+          name.value = v.name;
+          category.value = v.category;
+          slugValue = (mine || []).find((w) => w.id === which.value).slug;
+          slugEdited = false;
+        } else if (!which.value) {
+          slugValue = slugify(name.value);
+        }
+        name.readOnly = Boolean(which.value);
+        category.disabled = Boolean(which.value);
+        checkSlug();
+        refresh();
+      });
+      description.addEventListener("input", () => { descCount.textContent = description.value.length + " / 60"; refresh(); });
+      category.addEventListener("change", refresh);
+
+      // ================= C# source =================
+      const sourceInput = el("input", { type: "file", id: "sourceFile", accept: ".cs", class: "visually-hidden" });
+      const drop = el("label", { class: "up-drop", for: "sourceFile" },
+        svg(ICON.code, 32), el("div", { class: "lead" }, "Drop your .cs file here"),
+        el("div", { class: "sub" }, el("span", { class: "pick" }, "or choose a file")), sourceInput);
+      const fileRow = el("div", { class: "up-file", hidden: true });
+      const sourceArea = el("textarea", { class: "input code-area", id: "source", rows: "10", spellcheck: "false",
+        hidden: true, placeholder: "[DeskWidget(Name = \"Moon Phase\")]\npublic sealed class MoonPhase : WidgetWindow { }" });
+      const modeToggle = el("button", { type: "button", class: "up-link" }, "Paste code instead");
+      const sourceErr = el("span", { class: "up-err", id: "source-error", role: "status" });
+      let sourceText = "", sourceName = "", pasteMode = false;
+
+      function showFile() {
+        fileRow.replaceChildren(svg(ICON.file, 20),
+          el("span", { class: "grow" }, sourceName),
+          el("span", { class: "meta" }, kb(new TextEncoder().encode(sourceText).length)),
+          el("button", { type: "button", class: "up-link", onclick: () => { sourceInput.click(); } }, "Replace"));
+        fileRow.hidden = false;
+        drop.hidden = true;
+      }
+      function checkSource(text) {
+        const bytes = new TextEncoder().encode(text).length;
+        if (bytes > MAX_SOURCE) return "That file is " + kb(bytes) + ". The limit is 512 KB.";
+        const marks = (text.match(/\[\s*DeskWidget\b/g) || []).length;
+        if (marks !== 1) return marks ? "Found " + marks + " [DeskWidget] classes. There must be exactly one." :
+          "No [DeskWidget] class found.";
+        const hidden = hiddenCharacters(text);
+        if (hidden.length) return "There's a hidden character (" + hidden[0].code + " on line " + hidden[0].line +
+          ") that makes code read differently from how it runs. Remove it and try again.";
+        return "";
+      }
+      async function takeFile(file) {
+        sourceErr.textContent = "";
+        if (!/\.cs$/i.test(file.name)) { sourceErr.textContent = "That isn't a .cs file."; refresh(); return; }
+        if (file.size > MAX_SOURCE) { sourceErr.textContent = "That file is " + kb(file.size) + ". The limit is 512 KB."; refresh(); return; }
+        sourceText = (await file.text()).replace(/^﻿/, "");
+        sourceName = file.name;
+        sourceErr.textContent = checkSource(sourceText);
+        showFile();
+        refresh();
+      }
+      sourceInput.addEventListener("change", () => { if (sourceInput.files[0]) takeFile(sourceInput.files[0]); });
+      for (const type of ["dragenter", "dragover"]) drop.addEventListener(type, (e) => { e.preventDefault(); drop.classList.add("hot"); });
+      for (const type of ["dragleave", "drop"]) drop.addEventListener(type, () => drop.classList.remove("hot"));
+      drop.addEventListener("drop", (e) => { e.preventDefault(); if (e.dataTransfer.files[0]) takeFile(e.dataTransfer.files[0]); });
+      sourceArea.addEventListener("input", () => {
+        sourceText = sourceArea.value.replace(/^﻿/, "");
+        sourceErr.textContent = sourceText.trim() ? checkSource(sourceText) : "";
+        refresh();
+      });
+      modeToggle.addEventListener("click", () => {
+        pasteMode = !pasteMode;
+        modeToggle.textContent = pasteMode ? "Upload a file instead" : "Paste code instead";
+        sourceArea.hidden = !pasteMode;
+        drop.hidden = pasteMode || !fileRow.hidden;
+        fileRow.hidden = pasteMode || !sourceName;
+        // Only the active mode is submitted.
+        sourceText = pasteMode ? sourceArea.value.replace(/^﻿/, "") : (sourceName ? sourceText : "");
+        sourceErr.textContent = sourceText.trim() ? checkSource(sourceText) : "";
+        refresh();
       });
 
+      // ================= preview =================
+      const previewInput = el("input", { type: "file", id: "preview", accept: "image/png", class: "visually-hidden" });
+      const previewThumb = el("span", { class: "thumb" }, svg(ICON.image, 24));
+      const previewDrop = el("label", { class: "up-drop row", for: "preview" }, previewThumb,
+        el("span", {}, el("span", { class: "lead" }, "Add a PNG, up to 100 KB"),
+          el("span", { class: "sub" }, "In the app, right-click your widget under Installed › Save Preview.")),
+        previewInput);
+      const previewDone = el("div", { class: "up-file", hidden: true });
+      const previewErr = el("span", { class: "up-err", id: "preview-error", role: "status" });
+      let preview = null;
+
+      function clearPreview() {
+        preview = null;
+        previewDone.hidden = true;
+        previewDrop.hidden = false;
+        previewInput.value = "";
+        paintCard();
+      }
+      async function takePreview(file) {
+        previewErr.textContent = "";
+        if (!/^image\/png$/i.test(file.type) && !/\.png$/i.test(file.name)) {
+          previewErr.textContent = "The preview must be a PNG image.";
+          return;
+        }
+        try {
+          const cleaned = await cleanPreview(file);
+          if (cleaned.size > MAX_PREVIEW || cleaned.base64.length > MAX_PREVIEW_B64) {
+            previewErr.textContent = "Even trimmed, that image is " + kb(cleaned.size) +
+              ". Save a smaller preview (the limit is 100 KB).";
+            clearPreview();
+            return;
+          }
+          preview = cleaned;
+          previewDone.replaceChildren(
+            el("span", { class: "thumb" }, el("img", { src: cleaned.url, alt: "" })),
+            el("span", { class: "grow" }, "Trimmed to " + cleaned.width + " × " + cleaned.height),
+            el("span", { class: "meta" }, kb(cleaned.size)),
+            el("button", { type: "button", class: "up-link", onclick: () => previewInput.click() }, "Replace"),
+            el("button", { type: "button", class: "up-link", onclick: clearPreview }, "Remove"));
+          previewDone.hidden = false;
+          previewDrop.hidden = true;
+          paintCard();
+        } catch (e) {
+          previewErr.textContent = "That image couldn't be read.";
+          clearPreview();
+        }
+      }
+      previewInput.addEventListener("change", () => { if (previewInput.files[0]) takePreview(previewInput.files[0]); });
+      for (const type of ["dragenter", "dragover"]) previewDrop.addEventListener(type, (e) => { e.preventDefault(); previewDrop.classList.add("hot"); });
+      for (const type of ["dragleave", "drop"]) previewDrop.addEventListener(type, () => previewDrop.classList.remove("hot"));
+      previewDrop.addEventListener("drop", (e) => { e.preventDefault(); if (e.dataTransfer.files[0]) takePreview(e.dataTransfer.files[0]); });
+
+      // ================= aside: the real Explore card =================
+      const cardHost = el("div", { class: "preview-card", "aria-hidden": "true" });
+      function paintCard() {
+        const artNode = preview
+          ? el("div", { class: "art" }, el("img", { src: preview.url, alt: "" }))
+          : art(null, name.value || "Widget name", category.value);
+        cardHost.replaceChildren(widgetCard({
+          id: which.value || fullId(), name: name.value || "Widget name", author: username,
+          category: category.value || "", version: (latest(which.value) || { version: 0 }).version + 1,
+        }, artNode));
+        if (!category.value) {
+          const by = cardHost.querySelector(".by");
+          if (by) by.replaceChildren(el("a", { href: "profile.html?user=" + encodeURIComponent(username) }, username), " · Category");
+        }
+      }
+
+      // ================= submit =================
+      const submit = el("button", { class: "button", type: "submit", disabled: true }, "Send for Review");
+      const submitNote = el("span", { class: "note" },
+        REVIEW_DAYS ? "Reviews usually take " + REVIEW_DAYS + " days." : "");
+      const result = el("div");
+
+      function refresh() {
+        paintCard();
+        const ok = Boolean(name.value.trim()) && Boolean(category.value) &&
+          Boolean(sourceText.trim()) && !sourceErr.textContent && !slugError &&
+          (which.value || /^[a-z0-9-]{1,36}$/.test(slugValue));
+        submit.disabled = !ok;
+      }
+
+      const form = el("form", { class: "up-form", novalidate: true, onsubmit: async (e) => {
+        e.preventDefault();
+        const fail = (text) => {
+          result.replaceChildren(notice(text, true));
+          submit.replaceChildren("Send for Review");
+          submit.disabled = false;
+          form.querySelectorAll("input, select, textarea, button").forEach((f) => { f.disabled = false; });
+        };
+        result.replaceChildren();
+        submit.disabled = true;
+        submit.replaceChildren(el("span", { class: "spinner" }), " Sending…");
+        form.querySelectorAll("input, select, textarea").forEach((f) => { f.disabled = true; });
+
+        const text = sourceText.replace(/^﻿/, "");
+        const problem = checkSource(text);
+        if (problem) return fail(problem);
+
+        let widgetId = which.value;
+        if (!widgetId) {
+          if (!/^[a-z0-9-]{1,36}$/.test(slugValue)) return fail("The id can use lowercase letters, digits and hyphens.");
+          widgetId = "u." + username + "." + slugValue;
+          const { error } = await createWidget({ id: widgetId, owner: user.id, slug: slugValue });
+          if (error) return fail("That id can't be used: " + error.message);
+        }
+        const { error } = await createVersion({
+          widget_id: widgetId, name: name.value.trim(), category: category.value,
+          description: description.value.trim(), api_version: 1, source: text,
+          preview: preview ? preview.base64 : null,
+        });
+        if (error) return fail("It wasn't sent: " + error.message);
+        done(widgetId);
+      } },
+        el("section", { class: "up-sec" }, el("h2", {}, "Details"),
+          el("div", { class: "up-fields" },
+            el("div", { class: "field" }, el("label", { for: "which" }, "Widget"), selectWrap(which),
+              el("span", { class: "hint" }, "Start a new widget, or send a new version of one of yours.")),
+            el("div", { class: "field" }, el("label", { for: "name" }, "Name"), name),
+            idRow,
+            el("div", { class: "field" }, el("label", { for: "category" }, "Category"), selectWrap(category)),
+            el("div", { class: "field" },
+              el("div", { class: "up-row-label" }, el("label", { for: "description" }, "Description"), descCount),
+              description))),
+        el("section", { class: "up-sec" }, el("h2", {}, "C# source"),
+          el("div", { class: "up-fields" },
+            drop, fileRow, sourceArea,
+            el("span", { class: "hint" }, "One file, up to 512 KB, with exactly one [DeskWidget] class. ",
+              el("a", { href: REPO_URL + "/blob/main/samples/HelloWidget.cs" }, "See the sample"), "."),
+            modeToggle, sourceErr)),
+        el("section", { class: "up-sec" }, el("h2", {}, "Preview image"),
+          el("div", { class: "up-fields" },
+            previewDrop, previewDone,
+            el("span", { class: "hint" }, "Optional. Without one, Explore shows a category icon. In the app, right-click your widget under Installed → Save Preview."),
+            previewErr)),
+        el("div", { class: "up-submit" }, submit, submitNote),
+        result);
+
+      name.setAttribute("aria-describedby", "id-error");
+      sourceArea.setAttribute("aria-describedby", "source-error");
+      previewInput.setAttribute("aria-describedby", "preview-error");
+
+      // ================= your uploads =================
+      const list = el("div", { class: "up-list" });
+      function row(widget) {
+        const vs = byWidget[widget.id] || [];
+        const v = vs[0];
+        const label = v ? v.name : widget.id;
+        const item = el("div", { class: "up-item" });
+        const menu = el("div", { class: "menu", role: "menu" },
+          el("button", { type: "button", role: "menuitem", class: "danger", onclick: () => {
+            menu.classList.remove("open");
+            confirmDialog("Delete " + label + "?",
+              "It will be removed from Explore for everyone. This can't be undone.", "Delete", async () => {
+                const { error } = await deleteWidget(widget.id);
+                if (error) { toast(error.message); return; }
+                item.remove();
+                toast("Deleted " + label + ".");
+                if (!list.children.length) list.replaceChildren(el("p", { class: "t-reduced" }, "Nothing sent yet."));
+              });
+          } }, "Delete…"));
+        const more = el("button", { type: "button", class: "up-more", "aria-haspopup": "menu",
+          "aria-expanded": "false", "aria-label": "More options for " + label, onclick: (e) => {
+            e.stopPropagation();
+            const open = !menu.classList.contains("open");
+            menu.classList.toggle("open", open);
+            more.setAttribute("aria-expanded", String(open));
+          } }, svg(ICON.dots, 20));
+        document.addEventListener("click", (e) => { if (!menu.contains(e.target)) menu.classList.remove("open"); });
+        item.replaceChildren(
+          el("div", { class: "grow" },
+            el("div", { class: "name" }, label),
+            el("div", { class: "meta" }, el("code", {}, widget.id),
+              v ? " · Version " + v.version + " · Sent " + formatDate(v.created_at) : " · Nothing sent yet")),
+          v ? el("span", { class: "up-pill " + v.status },
+            v.status === "pending" ? "In review" : v.status === "approved" ? "Approved" : "Rejected") : null,
+          el("button", { type: "button", class: "up-link", onclick: () => {
+            which.value = widget.id;
+            which.dispatchEvent(new Event("change"));
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            name.focus();
+          } }, "Send new version"),
+          more, menu);
+        return item;
+      }
+      list.replaceChildren(...(mine || []).map(row));
+      if (!(mine || []).length) list.replaceChildren(el("p", { class: "t-reduced" }, "Nothing sent yet."));
+
+      function done(widgetId) {
+        form.replaceWith(el("div", { class: "up-form" },
+          el("div", { class: "up-done", role: "status" },
+            "Sent. You'll see it under Your uploads while it's in review.")));
+        const v = { widget_id: widgetId, version: ((latest(widgetId) || { version: 0 }).version) + 1,
+          name: name.value.trim(), status: "pending", created_at: new Date().toISOString() };
+        (byWidget[widgetId] || (byWidget[widgetId] = [])).unshift(v);
+        const widget = (mine || []).find((w) => w.id === widgetId) || { id: widgetId, slug: slugValue };
+        const fresh = row(widget);
+        const old = [...list.children].find((c) => c.querySelector("code") && c.querySelector("code").textContent === widgetId);
+        if (old) old.remove();
+        if (list.firstElementChild && list.firstElementChild.tagName === "P") list.replaceChildren();
+        list.prepend(fresh);
+      }
+
       page.replaceChildren(
-        el("p", { class: "t-reduced" }, "Signed in as " + username + "."),
-        form,
-        el("h2", { class: "block", id: "uploads" }, "Your Uploads"),
-        widgetSections.length ? el("div", {}, widgetSections) : el("p", { class: "t-reduced" }, "Nothing sent yet."));
+        el("div", { class: "upload-grid" },
+          form,
+          el("aside", { class: "up-aside" },
+            el("section", {}, el("h3", {}, "How it'll look in Explore"), cardHost),
+            el("section", {}, el("h3", {}, "What happens next"),
+              el("ol", { class: "up-steps" },
+                el("li", {}, el("span", { class: "num" }, "1"), "The owner reads your code, line by line."),
+                el("li", {}, el("span", { class: "num" }, "2"), "Once approved, it appears in Explore."),
+                el("li", {}, el("span", { class: "num" }, "3"), "Every new version goes through review again."))))),
+        el("section", { class: "up-wide up-uploads", id: "uploads" }, el("h2", {}, "Your uploads"), list));
+
+      paintId();
+      refresh();
     }
     main().catch(() => page.replaceChildren(notice("This page couldn't load. Check your connection and reload.", true)));
   </script>

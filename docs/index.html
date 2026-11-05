@@ -16,101 +16,215 @@
     <section class="tile hero">
       <h1 class="t-hero">Your desktop, at a glance.</h1>
       <p class="tile-sub">Widgets for Windows that stay out of your way.</p>
-      <p class="availability">Free and open source · Windows 10 and 11 · Nothing else to install</p>
+      <div class="hero-carousel">
+        <!-- assets/carousel.js renders in here; assets/hero-intro.js animates a clone of its
+             resting ring into place first, then mounts it. -->
+        <div class="lens" id="lens" tabindex="0" aria-label="Widget carousel">
+          <div class="lens-stage" id="lens-stage">
+            <div class="carousel-scene" id="carousel"></div>
+          </div>
+        </div>
+      </div>
       <div class="actions center">
         <a class="button download" href="#">Download</a>
         <a class="more" href="explore.html">Explore widgets</a>
       </div>
-      <div class="carousel-scene" id="carousel" aria-label="Widget carousel"></div>
+      <p class="availability">Free and open source · Windows 10 and 11 · Nothing else to install</p>
     </section>
 
-    <!-- Light: the numbers as stat callouts (§2.2). -->
-    <section class="tile light">
-      <h2 class="t-section">Light. Really light.</h2>
-      <p class="tile-sub">Every widget runs in one small native process.</p>
-      <div class="stats">
-        <div><div class="stat">33 MB</div><div class="stat-caption">of memory with seven widgets on the desktop</div></div>
-        <div><div class="stat">0.3%</div><div class="stat-caption">of one CPU core while they update</div></div>
-        <div><div class="stat">0</div><div class="stat-caption">runtimes to install. It uses the .NET that ships with Windows</div></div>
-      </div>
-    </section>
+    <!-- 1. Performance: the numbers, then appearance and privacy as two tiles (§2.2). -->
+    <section class="band a">
+      <div class="band-in">
+        <p class="eyebrow">Performance</p>
+        <h2 class="t-band">Light. Really light.</h2>
+        <p class="band-sub">Every widget runs in one small native process. Your desktop barely notices it&rsquo;s there.</p>
 
-    <!-- Two half tiles. -->
-    <div class="halves">
-      <section class="tile half light">
-        <h2 class="t-section">Light or dark.</h2>
-        <p class="tile-sub">Or Vibrant, with your wallpaper blurred behind it.</p>
-        <div class="pair two">
-          <canvas class="small" id="focus-light" width="170" height="170" aria-label="Focus timer in the light appearance (interactive)"></canvas>
-          <canvas class="small" id="focus-dark" width="170" height="170" aria-label="Focus timer in the dark appearance (interactive)"></canvas>
+        <div class="stat-grid">
+          <div>
+            <p class="stat-lead">Just</p>
+            <p class="stat-big">33<span>&nbsp;MB</span></p>
+            <p class="stat-cap">of memory with seven widgets on your desktop.</p>
+          </div>
+          <div>
+            <p class="stat-lead">About</p>
+            <p class="stat-big">0.3<span>%</span></p>
+            <p class="stat-cap">of a single CPU core, even while they update.</p>
+          </div>
+          <div>
+            <p class="stat-lead">Nothing</p>
+            <p class="stat-big">extra</p>
+            <p class="stat-cap">to install. It runs on the .NET already built into Windows.</p>
+          </div>
         </div>
-      </section>
-      <section class="tile half dark">
-        <h2 class="t-section">Private by default.</h2>
-        <p class="tile-sub">Tokens and calendar links are encrypted for your Windows account. Nothing is read until you choose.</p>
-        <div class="pair">
-          <img src="assets/img/reminders-light.png" width="364" height="170" alt="Reminders widget">
+
+        <div class="perf-tiles">
+          <div class="perf-tile">
+            <h3>Light, dark,<br>or Vibrant.</h3>
+            <p>Vibrant lets your wallpaper glow softly through every widget.</p>
+            <!-- The Focus Timer the app ships (assets/widgets.js), drawn three ways over a stand-in wallpaper. -->
+            <div class="wallpaper">
+              <div class="focus-row">
+                <canvas id="focus-light" aria-label="Focus timer in the light appearance (interactive)"></canvas>
+                <canvas id="focus-dark" aria-label="Focus timer in the dark appearance (interactive)"></canvas>
+                <!-- Vibrant is drawn here, not by widgets.js: that component takes its colours
+                     from a fixed table and paints its card into the canvas, which no CSS rule can
+                     make translucent. Same content, glass instead of a solid card. -->
+                <div class="focus-card focus-static" role="img" aria-label="Focus timer in the vibrant appearance">
+                  <svg viewBox="0 0 128 128" width="128" height="128" aria-hidden="true">
+                    <text class="fs-label" x="12" y="22">Focus</text>
+                    <text class="fs-state" x="116" y="21">Ready</text>
+                    <circle cx="47" cy="73" r="31" fill="none" stroke="#FF9500" stroke-width="6.8"/>
+                    <text class="fs-time" x="47" y="73">25:00</text>
+                    <circle cx="105" cy="60" r="10.5" fill="#FF9500"/>
+                    <path d="M102 55.5 102 64.5 109 60Z" fill="#ffffff"/>
+                    <circle cx="105" cy="87" r="10.5" fill="#ffffff" fill-opacity=".6"/>
+                    <path d="M107 83.5A4.1 4.1 0 1 1 103 90.6" fill="none" stroke="#1d1d1f" stroke-width="1.3" stroke-linecap="round"/>
+                    <path d="M104.8 80.8 110.2 83 106.4 86.4Z" fill="#1d1d1f"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="perf-tile priv on-black">
+            <span class="priv-icon">
+              <svg class="ico" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10.5" rx="3"/><path d="M8.25 10.5V8a3.75 3.75 0 0 1 7.5 0v2.5"/></svg>
+            </span>
+            <h3>Private<br>by default.</h3>
+            <p>Your tokens and calendar links are encrypted to your Windows account. Nothing is read until you say so.</p>
+            <div class="priv-list">
+              <div class="priv-row">
+                <svg class="ico" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="12" r="4"/><path d="M12 12h8M17 12v3"/></svg>
+                <span>Account tokens</span>
+                <span class="right ok">
+                  <svg class="ico" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10.5" rx="3"/><path d="M8.25 10.5V8a3.75 3.75 0 0 1 7.5 0v2.5"/></svg>
+                  Encrypted
+                </span>
+              </div>
+              <div class="priv-row">
+                <svg class="ico" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8.5 3v4M15.5 3v4"/></svg>
+                <span>Calendar links</span>
+                <span class="right ok">
+                  <svg class="ico" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10.5" rx="3"/><path d="M8.25 10.5V8a3.75 3.75 0 0 1 7.5 0v2.5"/></svg>
+                  Encrypted
+                </span>
+              </div>
+              <div class="priv-row">
+                <svg class="ico" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.75"/></svg>
+                <span>Data access</span>
+                <span class="right muted">Only when you allow</span>
+              </div>
+            </div>
+          </div>
         </div>
-      </section>
-    </div>
-
-    <!-- What's included. -->
-    <section class="tile light">
-      <h2 class="t-section">Everything you glance at.</h2>
-      <p class="tile-sub">Built in, and ready the moment you drag them out.</p>
-      <ul class="included">
-        <li><strong>Clocks</strong>Analog, dark and world clocks</li>
-        <li><strong>Calendar</strong>Today, next events and the month, from any .ics link</li>
-        <li><strong>Weather</strong>Now and the next hours, from Open-Meteo</li>
-        <li><strong>Focus Timer</strong>Start, pause, and it keeps going across restarts</li>
-        <li><strong>Reminders and Notes</strong>Type straight on the desktop</li>
-        <li><strong>System</strong>CPU, memory and disk</li>
-        <li><strong>Now Playing</strong>Spotify, browsers, Media Player</li>
-        <li><strong>Photo Frame</strong>A picture from your folder, GIFs too</li>
-        <li><strong>GitHub</strong>Profile, streak and contributions</li>
-        <li><strong>Formula 1</strong>Race hub and live timing</li>
-      </ul>
-    </section>
-
-    <!-- Community. -->
-    <section class="tile dark">
-      <h2 class="t-section">Made by people. Read by a person.</h2>
-      <p class="tile-sub">Community widgets are plain C#. The owner reads every version before it appears, and the app checks it's exactly that code before it runs.</p>
-      <div class="actions center">
-        <a class="button" href="explore.html">Explore widgets</a>
-        <a class="more on-dark" href="upload.html">Upload yours</a>
       </div>
     </section>
 
-    <!-- Make your own. -->
-    <section class="tile light">
-      <h2 class="t-section">Make your own.</h2>
-      <p class="tile-sub">One C# file. Draw with GDI+, and Desk Widgets compiles it on the PC.</p>
-      <pre class="code sample" aria-label="Example widget source"><span class="c">[DeskWidget(Name = "Hello", Description = "The smallest community widget")]</span>
-public sealed class HelloWidget : WidgetWindow
-{
-    public HelloWidget(Section s) : base(s) { }
-
-    protected override Size Measure() { return new Size(Px(170), Px(170)); }
-
-    protected override void Draw(Graphics g)
-    {
-        g.DrawString("Hello", font, Brushes.White, Px(16), Px(16));
-    }
-}</pre>
-      <div class="actions center">
-        <a class="more" id="sample">Read the full sample</a>
-        <a class="more" href="upload.html">Upload a widget</a>
+    <!-- 2. Catalog: the built-in widgets. One icon colour, no cards (§2.3). -->
+    <section class="band b" id="catalog">
+      <div class="band-in">
+        <h2 class="t-band">Everything you<br>glance at.</h2>
+        <p class="band-sub">Ten widgets, built in. Drag one onto your desktop and it&rsquo;s ready.</p>
+        <div class="cat-grid">
+          <div class="cat-item">
+            <svg class="ico" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+            <h3>Clocks</h3>
+            <p>Analog, dark and world clocks.</p>
+          </div>
+          <div class="cat-item">
+            <svg class="ico" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8.5 3v4M15.5 3v4"/></svg>
+            <h3>Calendar</h3>
+            <p>Today, what&rsquo;s next and the month, from any .ics link.</p>
+          </div>
+          <div class="cat-item">
+            <svg class="ico" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7.5" cy="7.5" r="3"/><path d="M17.5 19H10a4.5 4.5 0 0 1 0-9 5 5 0 0 1 9.4 1.6A3.7 3.7 0 0 1 17.5 19Z"/></svg>
+            <h3>Weather</h3>
+            <p>Right now and the hours ahead, from Open-Meteo.</p>
+          </div>
+          <div class="cat-item">
+            <svg class="ico" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4M9 2.5h6"/></svg>
+            <h3>Focus Timer</h3>
+            <p>Start, pause, and it keeps going after a restart.</p>
+          </div>
+          <div class="cat-item">
+            <svg class="ico" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3.5" width="16" height="17" rx="3"/><path d="M8 9h8M8 13h8M8 17h4"/></svg>
+            <h3>Reminders &amp; Notes</h3>
+            <p>Type straight onto your desktop.</p>
+          </div>
+          <div class="cat-item">
+            <svg class="ico" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/><rect x="9.5" y="9.5" width="5" height="5" rx="1.5"/><path d="M9 2.5V5M15 2.5V5M9 19v2.5M15 19v2.5M2.5 9H5M2.5 15H5M19 9h2.5M19 15h2.5"/></svg>
+            <h3>System</h3>
+            <p>CPU, memory and disk at a glance.</p>
+          </div>
+          <div class="cat-item">
+            <svg class="ico" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 17.5V5.5l10-2v12"/><circle cx="7" cy="17.5" r="2.5"/><circle cx="17" cy="15.5" r="2.5"/></svg>
+            <h3>Now Playing</h3>
+            <p>Spotify, your browser or Media Player.</p>
+          </div>
+          <div class="cat-item">
+            <svg class="ico" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="3"/><circle cx="8.5" cy="10" r="1.75"/><path d="M4 17l4.5-4.5 3.5 3.5 3-2.5 5 4.5"/></svg>
+            <h3>Photo Frame</h3>
+            <p>A picture from any folder. GIFs too.</p>
+          </div>
+          <div class="cat-item">
+            <svg class="ico" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="5.5" r="2.5"/><circle cx="7" cy="18.5" r="2.5"/><circle cx="17" cy="8.5" r="2.5"/><path d="M7 8v8M17 11v1a4 4 0 0 1-4 4H9.5"/></svg>
+            <h3>GitHub</h3>
+            <p>Your profile, streak and contributions.</p>
+          </div>
+          <div class="cat-item">
+            <svg class="ico" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M5 5c4.5-2.2 9 2.2 14 0v8.5c-5 2.2-9.5-2.2-14 0z"/></svg>
+            <h3>Formula 1</h3>
+            <p>The race hub, with live timing.</p>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- Closing call to action. -->
-    <section class="tile closing">
-      <h2 class="t-section">Get Desk Widgets.</h2>
-      <p class="tile-sub">One file. Run it, and it's in your Start menu.</p>
-      <div class="actions center">
-        <a class="button download" href="#">Download for Windows</a>
-        <a class="more" id="source">Source on GitHub</a>
+    <!-- 3. Community: who writes them, and who reads them (§2.4). -->
+    <section class="band community on-black">
+      <div class="band-in">
+        <p class="eyebrow">Community</p>
+        <h2 class="t-band">Made by people.<br><span class="tail">Checked by a person.</span></h2>
+        <p class="cm-sub">Anyone can share a widget. None of them reach your desktop without a human review first.</p>
+        <div class="cm-cols">
+          <div class="cm-col">
+            <p class="cm-num">01</p>
+            <h3>Written in plain C#.</h3>
+            <p>Readable source, not a sealed package.</p>
+          </div>
+          <div class="cm-col">
+            <p class="cm-num">02</p>
+            <h3>Every version, read.</h3>
+            <p>The owner reviews each update before it&rsquo;s listed.</p>
+          </div>
+          <div class="cm-col">
+            <p class="cm-num">03</p>
+            <h3>Verified on your PC.</h3>
+            <p>Before it runs, the app checks the code is exactly what was reviewed.</p>
+          </div>
+        </div>
+        <div class="actions center">
+          <a class="button" href="explore.html">Explore widgets</a>
+          <a class="more" href="upload.html">Upload yours</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Download (§2.5). -->
+    <section class="band b band-dl">
+      <div class="band-in">
+        <h2 class="t-band">Get Desk Widgets.</h2>
+        <p class="band-sub">One file. Run it, and it&rsquo;s in your Start menu.</p>
+        <div class="actions center">
+          <a class="button download" href="#">
+            <svg class="ico" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7.5 11l4.5 4.5L16.5 11M5 20h14"/></svg>
+            Download for Windows
+          </a>
+          <a class="more" id="source">Source on GitHub</a>
+        </div>
+        <!-- The numbers are the latest release at the time of writing (v1.7.1, DeskWidgets.exe);
+             the script below refreshes them from the release itself, so they can't go stale. -->
+        <p class="dl-meta" id="release-meta">Free · Windows 10 and 11 · Version 1.7.1 · 0.3 MB</p>
       </div>
     </section>
   </main>
@@ -118,15 +232,34 @@ public sealed class HelloWidget : WidgetWindow
   <script type="module">
     import { nav, DOWNLOAD_URL, REPO_URL } from "./assets/site.js";
     import { focusTimer } from "./assets/widgets.js";
-    import { carousel } from "./assets/carousel.js";
+    import { heroIntro } from "./assets/hero-intro.js";
     nav("home");
     for (const a of document.querySelectorAll(".download")) a.href = DOWNLOAD_URL;
-    document.getElementById("sample").href = REPO_URL + "/blob/main/samples/HelloWidget.cs";
     document.getElementById("source").href = REPO_URL;
 
-    carousel(document.getElementById("carousel"), "assets/img/");
+    // The carousel is mounted by the intro: straight away for a repeat visit, reduced motion or a
+    // phone, otherwise once the clones have finished wrapping into its shape.
+    heroIntro({
+      wrapper: document.getElementById("lens"),
+      stage: document.getElementById("lens-stage"),
+      scene: document.getElementById("carousel"),
+      basePath: "assets/img/",
+    });
     focusTimer(document.getElementById("focus-light"), "light");
     focusTimer(document.getElementById("focus-dark"), "dark");
+
+    // The release's own tag and exe size, from the API the app's updater already uses
+    // (src/AppUpdater.cs). If it can't be read, the line keeps its numberless text.
+    fetch("https://api.github.com/repos/" + REPO_URL.split("github.com/")[1] + "/releases/latest")
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(r.status)))
+      .then(release => {
+        const exe = (release.assets || []).find(a => a.name === "DeskWidgets.exe");
+        const parts = ["Free", "Windows 10 and 11"];
+        if (release.tag_name) parts.push("Version " + String(release.tag_name).replace(/^v/, ""));
+        if (exe && exe.size) parts.push((exe.size / 1048576).toFixed(1) + " MB");
+        document.getElementById("release-meta").textContent = parts.join(" · ");
+      })
+      .catch(() => {});
   </script>
 </body>
 </html>

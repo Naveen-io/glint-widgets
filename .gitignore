@@ -16,3 +16,9 @@ node_modules/
 
 # scratch / debug
 bugs and glitches/
+
+# reforge-mcp
+reforge-state.json
+.reforge*
+reforge-state.json.bak.*
+REFORGE_CHANGES.md

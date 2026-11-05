@@ -56,7 +56,7 @@ create table if not exists public.versions (
   widget_id   text not null references public.widgets (id) on delete cascade,
   version     int  not null default 0,               -- 1, 2, 3... set by the trigger below
   name        text not null check (length(name) between 1 and 40),
-  category    text not null check (category in ('clocks', 'productivity', 'weather', 'system', 'media', 'developer', 'sports')),
+  category    text not null check (category in ('clocks', 'productivity', 'weather', 'system', 'media', 'developer', 'sports', 'finance', 'news', 'utility', 'social', 'health', 'travel', 'games')),
   description text not null default '' check (length(description) <= 120),
   api_version int  not null default 1 check (api_version >= 1),
   source      text not null check (octet_length(source) <= 524288),
@@ -68,6 +68,10 @@ create table if not exists public.versions (
   primary key (widget_id, version),
   check ((status = 'approved') = (sha256 is not null))
 );
+
+alter table public.versions drop constraint if exists versions_category_check;
+alter table public.versions add constraint versions_category_check
+  check (category in ('clocks', 'productivity', 'weather', 'system', 'media', 'developer', 'sports', 'finance', 'news', 'utility', 'social', 'health', 'travel', 'games'));
 
 -- ---------------------------------------------------------------- source must read as it compiles
 -- Characters that make code look different from what the C# compiler sees ("Trojan Source",
@@ -120,6 +124,9 @@ $$;
 drop trigger if exists versions_number on public.versions;
 create trigger versions_number before insert on public.versions
   for each row execute function public.next_version();
+
+create index if not exists idx_versions_approved_latest
+  on public.versions (widget_id, version desc) where status = 'approved';
 
 -- ---------------------------------------------------------------- row level security
 
@@ -215,6 +222,9 @@ create or replace view public.explore as
     join public.profiles p on p.id = w.owner
    where v.status = 'approved'
    order by v.widget_id, v.version desc;
+
+alter view public.authors set (security_invoker = false);
+alter view public.explore set (security_invoker = false);
 
 revoke all on public.authors, public.explore from anon, authenticated;
 grant select on public.authors, public.explore to anon, authenticated;
