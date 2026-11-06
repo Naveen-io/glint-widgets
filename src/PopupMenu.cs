@@ -104,6 +104,7 @@ namespace DeskWidgets
             levels.Add(root);
             root.PlaceAt(screen);
             root.Show();
+            root.FadeIn();
             Native.SetForegroundWindow(root.Handle);
             root.Activate();
             if (previous != IntPtr.Zero) Native.SendMessage(previous, Native.WM_NCACTIVATE, (IntPtr)1, IntPtr.Zero);
@@ -229,6 +230,7 @@ namespace DeskWidgets
             levels.Add(sub);
             sub.PlaceBeside(parent, index);
             sub.Show();
+            sub.FadeIn();
             if (highlightFirst) sub.MoveHighlight(1);
         }
 
@@ -262,8 +264,7 @@ namespace DeskWidgets
             hoverTimer.Dispose();
             var all = levels.ToArray();
             levels.Clear();
-            foreach (var l in all) l.Hide();
-            Ui.Later(delegate { foreach (var l in all) l.Dispose(); }); // never inside their own messages
+            foreach (var l in all) l.FadeOut(delegate { l.Dispose(); });
             if (refocus && previous != IntPtr.Zero && Native.IsWindowVisible(previous)) Native.SetForegroundWindow(previous);
             else if (previous != IntPtr.Zero) Native.SendMessage(previous, Native.WM_NCACTIVATE, IntPtr.Zero, IntPtr.Zero);
         }
@@ -290,6 +291,8 @@ namespace DeskWidgets
         public int Highlight = -1;
         public MenuLevel Child;
         public int ChildIndex = -1;
+        byte fadeOpacity;
+        Anim fadeAnim;
 
         public MenuLevel(MenuSession session, PopupMenu menu, bool root)
         {
@@ -452,7 +455,19 @@ namespace DeskWidgets
                             g.DrawString("", chevron, brush, new RectangleF(row.Right - TextRight - Px(6), row.Top, Px(14), row.Height), fmt);
                     }
                 }
-            surface.Present(Handle, 255);
+            surface.Present(Handle, fadeOpacity);
+        }
+
+        public void FadeIn()
+        {
+            if (fadeAnim != null) fadeAnim.Cancel();
+            fadeAnim = Anim.Run(0f, 255f, 150, delegate(float v) { fadeOpacity = (byte)v; if (IsHandleCreated && !IsDisposed) Render(); });
+        }
+
+        public void FadeOut(Action onDone)
+        {
+            if (fadeAnim != null) fadeAnim.Cancel();
+            fadeAnim = Anim.Run(fadeOpacity, 0f, 120, delegate(float v) { fadeOpacity = (byte)v; if (IsHandleCreated && !IsDisposed) Render(); }, onDone);
         }
 
         // ---- input goes to the session ----

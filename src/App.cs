@@ -288,9 +288,8 @@ namespace DeskWidgets
             string list = string.Join(", ", names);
             Ui.Later(delegate
             {
-                AlertDialog.Show("Some widgets moved to Explore",
-                    list + (names.Count == 1 ? " is" : " are") + " now available from the Explore page. " +
-                    "Open Explore to download " + (names.Count == 1 ? "it" : "them") + " — your settings will be kept.");
+                Toast.Show("Widgets moved to Explore",
+                    list + (names.Count == 1 ? " is" : " are") + " now on the Explore page.");
             });
         }
 
@@ -363,6 +362,7 @@ namespace DeskWidgets
             Size sz = w.WidgetSize;
             w.MoveTo(new Point(c.X - sz.Width / 2, c.Y - sz.Height / 2));
             if (Plugins.Guard(type, () => { w.Show(); return w; }) == null) { w.Dispose(); config.Remove(section); return; }
+            w.AnimateAppear();
             widgets.Add(w);
             RaiseWidgetsChanged();
         }
@@ -371,7 +371,7 @@ namespace DeskWidgets
         {
             widgets.Remove(w);
             config.Remove(w.Settings);
-            w.Close();
+            w.AnimateRemove();
             RaiseWidgetsChanged();
         }
 

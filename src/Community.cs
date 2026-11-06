@@ -327,7 +327,13 @@ namespace DeskWidgets
                         int latest = Number(r, "version");
                         if (p != null && latest > p.Version && p.UpdateVersion != latest) { p.UpdateVersion = latest; changed = true; }
                     }
-                    if (changed) WidgetRegistry.RaiseChanged();
+                    if (changed)
+                    {
+                        int count = Plugins.Installed.Count(p => p.UpdateVersion > p.Version);
+                        if (count > 0)
+                            Toast.Show("Updates Available", count == 1 ? "1 widget has a new version." : count + " widgets have new versions.");
+                        WidgetRegistry.RaiseChanged();
+                    }
                 });
             });
         }

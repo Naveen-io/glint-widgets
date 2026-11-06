@@ -198,7 +198,20 @@ namespace DeskWidgets
             var item = new SidebarItem(glyph, text) { Tag = target };
             item.SetBounds(Px(12), y, sidebar.Width - Px(24), Px(34));
             item.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top;
-            item.Click += delegate { ShowPage((string)item.Tag); };
+            item.Click += delegate
+            {
+                string t = (string)item.Tag;
+                if (page == null && t != null && t != InstalledPage && t != ExplorePage && t != SettingsPage)
+                {
+                    var sec = sections.FirstOrDefault(s => s.Category.Id == t);
+                    if (sec != null && sec.Header != null && sec.Header.Visible)
+                    {
+                        content.ScrollTo(sec.Header.Top - Px(12));
+                        return;
+                    }
+                }
+                ShowPage(t);
+            };
             sidebar.Controls.Add(item);
             nav.Add(item);
             y += Px(36);
@@ -229,6 +242,7 @@ namespace DeskWidgets
             else
                 header.Set("All Widgets", "Drag a widget onto your desktop, or double-click to add it.");
             content.ScrollToTop();
+            content.SlideIn();
             LayoutContent();
         }
 
@@ -401,9 +415,14 @@ namespace DeskWidgets
                 AppUpdater.CheckManual(delegate(bool found)
                 {
                     updateRefresh.StopSpin();
+                    Color targetColor = found ? Theme.Label : Color.FromArgb(52, 199, 89);
                     updateStatus.Text = found ? "Update available" : "Up to date";
-                    updateStatus.ForeColor = found ? Theme.Label : Color.FromArgb(52, 199, 89);
+                    updateStatus.ForeColor = content.BackColor;
                     updateStatus.Visible = true;
+                    Anim.Run(0f, 1f, 200, delegate(float v)
+                    {
+                        if (!IsDisposed) updateStatus.ForeColor = Theme.Blend(content.BackColor, targetColor, v);
+                    });
                     updateInstall.Visible = found;
                     LayoutContent();
                 });
@@ -729,8 +748,52 @@ namespace DeskWidgets
     sealed class SidebarItem : PaintedControl
     {
         public char Glyph;
-        public bool Selected, Toggle, On;
-        public Bitmap Photo; // drawn round in place of the glyph (the account row); not owned
+        public bool Toggle;
+        public Bitmap Photo;
+
+        bool selectedValue;
+        float selectionBlend;
+        Anim selectionAnim;
+
+        bool onValue;
+        float toggleBlend;
+        Anim toggleAnim;
+
+        public bool Selected
+        {
+            get { return selectedValue; }
+            set
+            {
+                if (value == selectedValue) return;
+                selectedValue = value;
+                if (IsHandleCreated)
+                {
+                    if (selectionAnim != null) selectionAnim.Cancel();
+                    selectionAnim = Anim.Run(selectionBlend, value ? 1f : 0f, 120,
+                        delegate(float v) { selectionBlend = v; Invalidate(); }, delegate { selectionAnim = null; });
+                }
+                else
+                    selectionBlend = value ? 1f : 0f;
+            }
+        }
+
+        public bool On
+        {
+            get { return onValue; }
+            set
+            {
+                if (value == onValue) return;
+                onValue = value;
+                if (IsHandleCreated)
+                {
+                    if (toggleAnim != null) toggleAnim.Cancel();
+                    toggleAnim = Anim.Run(toggleBlend, value ? 1f : 0f, 150,
+                        delegate(float v) { toggleBlend = v; Invalidate(); }, delegate { toggleAnim = null; });
+                }
+                else
+                    toggleBlend = value ? 1f : 0f;
+            }
+        }
 
         public SidebarItem(char glyph, string text)
         {
@@ -742,11 +805,11 @@ namespace DeskWidgets
         protected override void Draw(Graphics g)
         {
             var r = new RectangleF(0, 0, Width - 1, Height - 1);
-            if (Selected) Theme.FillRound(g, Theme.Selection, r, Px(Theme.RadiusSmall));
-            else if (HoverBlend > 0f)
+            float blend = Math.Max(selectionBlend, HoverBlend * 0.5f);
+            if (blend > 0f)
             {
                 Color sel = Theme.Selection;
-                Theme.FillRound(g, Color.FromArgb((int)(sel.A / 2 * HoverBlend), sel), r, Px(Theme.RadiusSmall));
+                Theme.FillRound(g, Color.FromArgb((int)(sel.A * blend), sel), r, Px(Theme.RadiusSmall));
             }
 
             var flags = TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding;
@@ -764,16 +827,20 @@ namespace DeskWidgets
             }
             else
                 TextRenderer.DrawText(g, Glyph.ToString(), Theme.Icons, new Rectangle(Px(12), 0, Px(20), Height), Theme.Link, flags);
-            TextRenderer.DrawText(g, Text, Selected ? Theme.Font(14, 600) : Theme.Font(14),
+            TextRenderer.DrawText(g, Text, selectedValue ? Theme.Font(14, 600) : Theme.Font(14),
                 new Rectangle(Px(42), 0, Width - Px(46) - (Toggle ? Px(44) : 0), Height), Theme.Label, flags | TextFormatFlags.EndEllipsis);
 
-            if (Toggle) // Apple switch: green-free, blue when on (macOS uses the accent color)
+            if (Toggle)
             {
                 var track = new RectangleF(Width - Px(44), (Height - Px(20)) / 2f, Px(34), Px(20));
-                Theme.FillRound(g, On ? Theme.PrimaryFill : Theme.Fill, track, track.Height / 2);
+                Color trackColor = Theme.Blend(Theme.Fill, Theme.PrimaryFill, toggleBlend);
+                Theme.FillRound(g, trackColor, track, track.Height / 2);
                 float d = track.Height - Px(4);
+                float offX = track.Left + Px(2);
+                float onX = track.Right - d - Px(2);
+                float knobX = offX + (onX - offX) * toggleBlend;
                 using (var knob = new SolidBrush(Color.White))
-                    g.FillEllipse(knob, On ? track.Right - d - Px(2) : track.Left + Px(2), track.Top + Px(2), d, d);
+                    g.FillEllipse(knob, knobX, track.Top + Px(2), d, d);
             }
         }
 
