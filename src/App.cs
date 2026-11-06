@@ -363,6 +363,7 @@ namespace DeskWidgets
             Size sz = w.WidgetSize;
             w.MoveTo(new Point(c.X - sz.Width / 2, c.Y - sz.Height / 2));
             if (Plugins.Guard(type, () => { w.Show(); return w; }) == null) { w.Dispose(); config.Remove(section); return; }
+            w.AnimateAppear();
             widgets.Add(w);
             RaiseWidgetsChanged();
         }
@@ -371,7 +372,7 @@ namespace DeskWidgets
         {
             widgets.Remove(w);
             config.Remove(w.Settings);
-            w.Close();
+            w.AnimateRemove();
             RaiseWidgetsChanged();
         }
 

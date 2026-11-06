@@ -13,6 +13,7 @@ namespace DeskWidgets
     sealed class AlertDialog : Form
     {
         int result = -1;
+        bool fadingOut;
 
         AlertDialog(string title, string message, IList<KeyValuePair<string, string>> facts, string linkText, Action link,
                     string[] buttons, ButtonStyle[] styles, int defaultIndex, int cancelIndex)
@@ -77,6 +78,25 @@ namespace DeskWidgets
                 if (i == cancelIndex) CancelButton = b;
             }
             ClientSize = new Size(width, y + Px(32) + pad);
+            Opacity = 0;
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            Anim.Run(0f, 1f, 150, delegate(float v) { if (!IsDisposed) Opacity = v; });
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (!fadingOut && Opacity > 0)
+            {
+                e.Cancel = true;
+                fadingOut = true;
+                Anim.Run(1f, 0f, 120, delegate(float v) { if (!IsDisposed) Opacity = v; }, delegate { if (!IsDisposed) Close(); });
+                return;
+            }
+            base.OnFormClosing(e);
         }
 
         int AddText(string text, Font font, Color color, int y, int inner, int pad)

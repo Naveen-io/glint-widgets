@@ -183,6 +183,16 @@ namespace DeskWidgets
 
         public void ScrollToTop() { ScrollTo(0); }
 
+        Anim slideAnim;
+
+        public void SlideIn()
+        {
+            if (slideAnim != null) slideAnim.Cancel();
+            int dist = WidgetWindow.Px(20);
+            viewport.Left = dist;
+            slideAnim = Anim.Run(dist, 0, 100, delegate(float v) { viewport.Left = (int)v; }, delegate { slideAnim = null; });
+        }
+
         protected override void WndProc(ref Message m)
         {
             const int WM_MOUSEWHEEL = 0x020A;

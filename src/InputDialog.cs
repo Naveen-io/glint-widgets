@@ -17,6 +17,7 @@ namespace DeskWidgets
         }
 
         readonly List<TextBox> boxes = new List<TextBox>();
+        bool fadingOut;
 
         InputDialog(string title, string hint, Field[] fields, string okText, string extraText, Action<InputDialog> extra)
         {
@@ -63,6 +64,25 @@ namespace DeskWidgets
             CancelButton = cancel;
             if (boxes.Count > 0) ActiveControl = boxes[0];
             ClientSize = new Size(width, y + ok.Height + pad);
+            Opacity = 0;
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            Anim.Run(0f, 1f, 150, delegate(float v) { if (!IsDisposed) Opacity = v; });
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (!fadingOut && Opacity > 0)
+            {
+                e.Cancel = true;
+                fadingOut = true;
+                Anim.Run(1f, 0f, 120, delegate(float v) { if (!IsDisposed) Opacity = v; }, delegate { if (!IsDisposed) Close(); });
+                return;
+            }
+            base.OnFormClosing(e);
         }
 
         int AddLabel(string text, Font font, Color color, int y, int inner, int pad)

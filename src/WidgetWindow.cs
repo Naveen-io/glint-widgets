@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -20,6 +21,15 @@ namespace DeskWidgets
         readonly Timer timer = new Timer();
         LayeredSurface surface;
         bool paused;
+
+        float appearProgress = 1f;
+        Anim appearAnim;
+        bool lifted;
+        float lockFlash;
+        Anim lockFlashAnim;
+        float animatedOpacity = -1;
+        int prevOpacityTarget = -1;
+        Anim opacityAnim;
 
         protected WidgetWindow(Section settings)
         {
@@ -44,7 +54,7 @@ namespace DeskWidgets
             var menu = new PopupMenu();
             BuildMenu(menu);
             menu.AddSeparator();
-            menu.AddCheck("Lock Position", Locked, delegate { Settings.Set("locked", !Locked); });
+            menu.AddCheck("Lock Position", Locked, delegate { Settings.Set("locked", !Locked); FlashLock(); });
             var opacity = menu.AddSubmenu("Opacity");
             foreach (int pct in new[] { 100, 85, 70, 50 })
             {
@@ -146,13 +156,51 @@ namespace DeskWidgets
                 if (surface != null) surface.Dispose();
                 surface = new LayeredSurface(sz.Width, sz.Height);
                 if (resizeCorner == Corner.None)
-                    PlaceOnScreen(); // keep the same relative anchor when the size changes
+                    PlaceOnScreen();
             }
             if (Size != sz) Size = sz;
-            Draw(surface.Graphics);
+
+            Graphics g = surface.Graphics;
+            bool scaling = appearProgress < 1f;
+            if (scaling)
+            {
+                float scale = 0.8f + 0.2f * appearProgress;
+                g.Clear(Color.Transparent);
+                g.TranslateTransform(sz.Width / 2f, sz.Height / 2f);
+                g.ScaleTransform(scale, scale);
+                g.TranslateTransform(-sz.Width / 2f, -sz.Height / 2f);
+            }
+
+            Draw(g);
+
+            if (scaling)
+                g.ResetTransform();
+
+            if (lifted)
+                DrawLiftGlow(g, sz);
+
+            if (lockFlash > 0f)
+                DrawLockFlash(g, sz);
+
             Corner handle = resizeCorner != Corner.None ? resizeCorner : hoverCorner;
-            if (handle != Corner.None) DrawResizeHandle(surface.Graphics, handle);
-            surface.Present(Handle, (byte)(OpacityPercent * 255 / 100));
+            if (handle != Corner.None) DrawResizeHandle(g, handle);
+
+            int targetByte = OpacityPercent * 255 / 100;
+            if (animatedOpacity < 0) animatedOpacity = targetByte;
+            if (prevOpacityTarget >= 0 && targetByte != prevOpacityTarget && opacityAnim == null)
+            {
+                float start = animatedOpacity;
+                opacityAnim = Anim.Run(start, targetByte, 200,
+                    delegate(float v) { animatedOpacity = v; if (IsHandleCreated && !IsDisposed && !paused) Render(); },
+                    delegate { opacityAnim = null; });
+            }
+            prevOpacityTarget = targetByte;
+
+            byte finalOpacity = (byte)Math.Max(0, Math.Min(255, animatedOpacity));
+            if (appearProgress < 1f)
+                finalOpacity = (byte)(finalOpacity * Math.Max(0f, appearProgress));
+
+            surface.Present(Handle, finalOpacity);
 
             int delay = NextFrameDelay();
             if (delay >= 0)
@@ -160,6 +208,45 @@ namespace DeskWidgets
                 timer.Interval = Math.Max(1, delay);
                 timer.Start();
             }
+        }
+
+        void DrawLiftGlow(Graphics g, Size sz)
+        {
+            using (var pen = new Pen(Color.FromArgb(35, 255, 255, 255), Px(2)))
+                g.DrawRectangle(pen, 1, 1, sz.Width - 3, sz.Height - 3);
+        }
+
+        void DrawLockFlash(Graphics g, Size sz)
+        {
+            int alpha = (int)(50 * lockFlash);
+            using (var pen = new Pen(Color.FromArgb(alpha, Theme.PrimaryFill), Px(2)))
+                g.DrawRectangle(pen, 1, 1, sz.Width - 3, sz.Height - 3);
+        }
+
+        internal void AnimateAppear()
+        {
+            if (appearAnim != null) appearAnim.Cancel();
+            appearProgress = 0f;
+            appearAnim = Anim.Run(0f, 1f, 200,
+                delegate(float v) { appearProgress = v; if (IsHandleCreated && !IsDisposed) Render(); },
+                delegate { appearAnim = null; });
+        }
+
+        internal void AnimateRemove()
+        {
+            if (appearAnim != null) appearAnim.Cancel();
+            appearAnim = Anim.Run(appearProgress, 0f, 200,
+                delegate(float v) { appearProgress = v; if (IsHandleCreated && !IsDisposed) Render(); },
+                delegate { appearAnim = null; Close(); });
+        }
+
+        void FlashLock()
+        {
+            if (lockFlashAnim != null) lockFlashAnim.Cancel();
+            lockFlash = 1f;
+            lockFlashAnim = Anim.Run(1f, 0f, 500,
+                delegate(float v) { lockFlash = v; if (IsHandleCreated && !IsDisposed) Render(); },
+                delegate { lockFlashAnim = null; });
         }
 
         internal void SetPaused(bool value)
@@ -348,8 +435,9 @@ namespace DeskWidgets
             }
             else if (m.Msg == Native.WM_EXITSIZEMOVE)
             {
+                lifted = false;
                 MoveTo(Location);
-                Render(); // vibrant widgets show what's behind their new spot
+                Render();
             }
             base.WndProc(ref m);
         }
@@ -442,6 +530,8 @@ namespace DeskWidgets
             Size slop = SystemInformation.DragSize;
             if (Math.Abs(e.X - pressedAt.X) < slop.Width && Math.Abs(e.Y - pressedAt.Y) < slop.Height) return;
             pressed = false;
+            lifted = true;
+            Render();
             Native.ReleaseCapture();
             Native.SendMessage(Handle, Native.WM_NCLBUTTONDOWN, (IntPtr)Native.HTCAPTION, IntPtr.Zero);
         }
