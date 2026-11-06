@@ -288,9 +288,8 @@ namespace DeskWidgets
             string list = string.Join(", ", names);
             Ui.Later(delegate
             {
-                AlertDialog.Show("Some widgets moved to Explore",
-                    list + (names.Count == 1 ? " is" : " are") + " now available from the Explore page. " +
-                    "Open Explore to download " + (names.Count == 1 ? "it" : "them") + " — your settings will be kept.");
+                Toast.Show("Widgets moved to Explore",
+                    list + (names.Count == 1 ? " is" : " are") + " now on the Explore page.");
             });
         }
 
