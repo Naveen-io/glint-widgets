@@ -58,6 +58,15 @@
     // stores it. WebP where the browser can encode it, PNG otherwise; site.js reads the format
     // back from the data's magic bytes.
     async function photoFrom(file) {
+      // A GIF is stored as-is: putting it through the canvas would keep only the first frame.
+      if (file.type === "image/gif") {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        let binary = "";
+        for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+        const b64 = btoa(binary);
+        if (b64.length > MAX_PHOTO_B64) throw new Error("gif too large");
+        return b64;
+      }
       const bitmap = await createImageBitmap(file);
       const side = Math.min(bitmap.width, bitmap.height);
       const canvas = Object.assign(document.createElement("canvas"), { width: PHOTO, height: PHOTO });
@@ -126,7 +135,7 @@
       const circle = el("div", { class: "photo-circle" });
       const paintCircle = () => circle.replaceChildren(avatar({ username, avatar: photo }, 88));
       const fileInput = el("input", { type: "file", id: "photo", class: "visually-hidden",
-        accept: "image/png,image/jpeg,image/webp" });
+        accept: "image/png,image/jpeg,image/webp,image/gif" });
       const photoError = el("span", { class: "up-err", id: "photo-error", role: "status" });
       const removeButton = el("button", { type: "button", class: "up-link", hidden: !photo,
         onclick: () => { photo = null; fileInput.value = ""; removeButton.hidden = true; paintCircle(); paintCard(); touched(); } }, "Remove");
@@ -140,7 +149,9 @@
           paintCard();
           touched();
         } catch (e) {
-          photoError.textContent = "That image couldn't be read. Try a PNG, JPG or WebP.";
+          photoError.textContent = e.message === "gif too large"
+            ? "That GIF is over 5 MB. Try a smaller or shorter animation."
+            : "That image couldn't be read. Try a PNG, JPG, WebP or GIF.";
         }
       });
 
@@ -194,7 +205,7 @@
               el("div", { class: "photo-links" },
                 el("label", { class: "up-link", for: "photo" }, "Change photo", fileInput),
                 removeButton),
-              el("span", { class: "hint" }, "Square crop, shown at 72px. PNG, JPG or WebP."),
+              el("span", { class: "hint" }, "Square crop, shown at 72px. PNG, JPG, WebP or GIF (animation is kept)."),
               photoError)),
           el("div", { class: "field" },
             el("div", { class: "up-row-label" }, el("label", { for: "bio" }, "Bio"), bioCount),
@@ -412,7 +423,7 @@
       const circle = el("div", { class: "photo-circle" });
       const paint = () => circle.replaceChildren(avatar({ username: username.value, avatar: photo }, 88));
       const fileInput = el("input", { type: "file", id: "photo", class: "visually-hidden",
-        accept: "image/png,image/jpeg,image/webp" });
+        accept: "image/png,image/jpeg,image/webp,image/gif" });
       fileInput.addEventListener("change", async () => {
         if (!fileInput.files[0]) return;
         try { photo = await photoFrom(fileInput.files[0]); paint(); } catch (e) { /* keep the initial */ }
@@ -447,7 +458,7 @@
             el("div", { class: "photo-actions" },
               el("div", { class: "up-label" }, "Profile photo"),
               el("label", { class: "up-link", for: "photo" }, "Choose a photo", fileInput),
-              el("span", { class: "hint" }, "Optional. Square crop, PNG, JPG or WebP."))),
+              el("span", { class: "hint" }, "Optional. PNG, JPG, WebP or GIF."))),
           el("div", { class: "field" }, el("label", { for: "username" }, "Username"), username,
             el("span", { class: "hint" }, "2 to 24 lowercase letters, digits or hyphens. You sign in with it, and it's part of your widgets' ids.")),
           el("div", { class: "field" }, el("label", { for: "password" }, "Password"), password,
