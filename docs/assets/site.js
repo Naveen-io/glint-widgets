@@ -347,8 +347,24 @@ export function art(preview, name, category) {
 // Opens Desk Widgets on this PC; it re-checks everything and always asks before installing.
 export const installUrl = (id, version) => `deskwidgets://install/${id}/${version}`;
 
-export function getButton(id, version, label = "Get") {
-  return el("a", { class: "get", href: installUrl(id, version), "aria-label": label + " (opens Desk Widgets)" }, label);
+// A protocol link does nothing visible when the app isn't installed, so visitors arriving from a
+// shared link click Get and see nothing. If the page still has focus 1.5s later, nothing opened.
+export function getButton(id, version, label = "Get", cls = "get") {
+  const check = () => {
+    let left = document.hidden;
+    const away = () => { left = true; };
+    addEventListener("blur", away);
+    document.addEventListener("visibilitychange", away);
+    setTimeout(() => {
+      removeEventListener("blur", away);
+      document.removeEventListener("visibilitychange", away);
+      if (left || document.hidden || !document.hasFocus()) return;
+      confirmDialog("Desk Widgets isn’t installed",
+        "Get opens the app on your PC. Download it, then click Get again to install this widget.",
+        "Download", () => { location.href = DOWNLOAD_URL; }, false);
+    }, 1500);
+  };
+  return el("a", { class: cls, href: installUrl(id, version), "aria-label": label + " (opens Desk Widgets)", onclick: check }, label);
 }
 
 // Characters that make code look different from what the C# compiler sees ("Trojan Source"):
@@ -384,14 +400,14 @@ export function formatDate(iso) {
   return iso ? new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "";
 }
 
-export function confirmDialog(title, message, action, onConfirm) {
+export function confirmDialog(title, message, action, onConfirm, destructive = true) {
   const overlay = el("div", { class: "dialog-overlay" },
     el("div", { class: "dialog" },
       el("h3", {}, title),
       el("p", {}, message),
       el("div", { class: "actions" },
         el("button", { class: "button grey small", type: "button", onclick: () => overlay.classList.remove("open") }, "Cancel"),
-        el("button", { class: "button destructive small", type: "button", onclick: async () => {
+        el("button", { class: destructive ? "button destructive small" : "button small", type: "button", onclick: async () => {
           overlay.classList.remove("open");
           await onConfirm();
         } }, action))));

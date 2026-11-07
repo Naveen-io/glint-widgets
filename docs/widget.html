@@ -10,7 +10,7 @@
   <main class="content section" id="page"></main>
 
   <script type="module">
-    import { nav, el, art, getButton, supabase, configured, categoryName, isValidId, notice, formatDate, installUrl, visibleSource, avatar } from "./assets/site.js";
+    import { nav, el, art, getButton, supabase, configured, categoryName, isValidId, notice, formatDate, visibleSource, avatar } from "./assets/site.js";
 
     nav(null);
     const page = document.getElementById("page");
@@ -52,7 +52,7 @@
               el("div", {}, el("a", { class: "t-reduced", href: "profile.html?user=" + encodeURIComponent(author.username), style: "color: inherit" }, "By " + author.username),
                 author.bio ? el("div", { class: "t-caption" }, author.bio) : null)),
             el("div", { class: "actions" },
-              el("a", { class: "button", href: installUrl(id, w.version) }, "Get"),
+              getButton(id, w.version, "Get", "button"),
               el("a", { class: "more", href: "#source" }, "View source")),
             el("p", { class: "t-caption" }, "Get opens Desk Widgets. It checks this exact code and asks before installing."))),
         el("div", { class: "info", role: "list" },
