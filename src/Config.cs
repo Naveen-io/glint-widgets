@@ -138,22 +138,16 @@ namespace DeskWidgets
             }
             string dir = Path.GetDirectoryName(path);
             string tmp = path + ".tmp";
-            for (int attempt = 0; attempt < 3; attempt++)
+            try
             {
-                try
-                {
-                    Directory.CreateDirectory(dir);
-                    File.WriteAllText(tmp, sb.ToString(), Encoding.UTF8);
-                    if (File.Exists(path)) File.Delete(path);
-                    File.Move(tmp, path);
-                    savePending = false;
-                    return;
-                }
-                catch (IOException) { }
-                catch (UnauthorizedAccessException) { }
-                System.Threading.Thread.Sleep(50);
+                Directory.CreateDirectory(dir);
+                File.WriteAllText(tmp, sb.ToString(), Encoding.UTF8);
+                if (File.Exists(path)) File.Delete(path);
+                File.Move(tmp, path);
+                savePending = false;
             }
-            savePending = true;
+            catch (IOException) { savePending = true; }
+            catch (UnauthorizedAccessException) { savePending = true; }
         }
 
         public bool HasPendingSave { get { return savePending; } }

@@ -30,6 +30,7 @@ namespace DeskWidgets
         float animatedOpacity = -1;
         int prevOpacityTarget = -1;
         Anim opacityAnim;
+        bool rendering;
 
         static int shiftX, shiftY;
 
@@ -151,7 +152,8 @@ namespace DeskWidgets
 
         public void Render()
         {
-            if (!IsHandleCreated || IsDisposed || paused) return;
+            if (!IsHandleCreated || IsDisposed || paused || rendering) return;
+            rendering = true;
             Size sz = GetSize();
             if (surface == null || surface.Width != sz.Width || surface.Height != sz.Height)
             {
@@ -206,6 +208,7 @@ namespace DeskWidgets
 
             surface.Present(Handle, finalOpacity);
 
+            rendering = false;
             int delay = NextFrameDelay();
             if (delay >= 0)
             {
@@ -248,9 +251,10 @@ namespace DeskWidgets
         {
             if (lockFlashAnim != null) lockFlashAnim.Cancel();
             lockFlash = 1f;
+            Cursor = Cursors.No;
             lockFlashAnim = Anim.Run(1f, 0f, 500,
                 delegate(float v) { lockFlash = v; if (IsHandleCreated && !IsDisposed) Render(); },
-                delegate { lockFlashAnim = null; });
+                delegate { lockFlashAnim = null; if (IsHandleCreated && !IsDisposed) Cursor = Cursors.Default; });
         }
 
         internal void SetPaused(bool value)

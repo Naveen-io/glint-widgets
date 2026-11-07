@@ -158,9 +158,9 @@ namespace DeskWidgets
             SystemEvents.SessionSwitch += OnSessionSwitch;
             SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
             SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
-            DesktopBackdrop.BackdropChanged += delegate { foreach (var w in widgets) w.BackdropChanged(); };
+            DesktopBackdrop.BackdropChanged += delegate { foreach (var w in widgets.ToArray()) w.BackdropChanged(); };
             StartWallpaperWatcher();
-            pixelShiftTimer.Tick += delegate { WidgetWindow.AdvancePixelShift(); foreach (var w in widgets) w.Reposition(); };
+            pixelShiftTimer.Tick += delegate { WidgetWindow.AdvancePixelShift(); foreach (var w in widgets.ToArray()) w.Reposition(); };
             if (PixelShift) pixelShiftTimer.Start();
             showLibraryWait = ThreadPool.RegisterWaitForSingleObject(showLibrary,
                 delegate { messageWindow.PostOpenLibrary(); }, null, Timeout.Infinite, false);
@@ -644,14 +644,14 @@ namespace DeskWidgets
         {
             if (e.Reason != SessionSwitchReason.SessionLock && e.Reason != SessionSwitchReason.SessionUnlock) return;
             bool locked = e.Reason == SessionSwitchReason.SessionLock;
-            foreach (var w in widgets) w.SetPaused(locked);
+            foreach (var w in widgets.ToArray()) w.SetPaused(locked);
         }
 
         // Resolution/monitor changed: re-apply each widget's relative position.
         void OnDisplaySettingsChanged(object sender, EventArgs e)
         {
             DesktopBackdrop.Invalidate();
-            foreach (var w in widgets) { w.Reposition(); w.BackdropChanged(); }
+            foreach (var w in widgets.ToArray()) { w.Reposition(); w.BackdropChanged(); }
         }
 
         // New wallpaper: vibrant widgets re-sample what's behind them.
@@ -668,7 +668,7 @@ namespace DeskWidgets
                 RunOnUi(delegate
                 {
                     DesktopBackdrop.Apply(newMap, newVirt);
-                    foreach (var w in widgets) w.BackdropChanged();
+                    foreach (var w in widgets.ToArray()) w.BackdropChanged();
                 });
             });
         }
@@ -742,7 +742,7 @@ namespace DeskWidgets
             {
                 AppSection.Set("pixel_shift", value);
                 if (value) pixelShiftTimer.Start();
-                else { pixelShiftTimer.Stop(); WidgetWindow.ResetPixelShift(); foreach (var w in widgets) w.Reposition(); }
+                else { pixelShiftTimer.Stop(); WidgetWindow.ResetPixelShift(); foreach (var w in widgets.ToArray()) w.Reposition(); }
             }
         }
 
