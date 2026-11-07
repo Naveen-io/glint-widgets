@@ -30,8 +30,8 @@ const ITEMS = [
   widget("minesweeper", "Minesweeper", "saif", "games", "The classic, on your desktop.", null),            // no art yet: the category icon shows
   widget("gmail", "Gmail", "codewithaiyan", "productivity", "Unread mail at a glance.", "gmail-dark.png"),
   widget("watchlist", "Watchlist", "saif", "finance", "Your tickers, updated through the day.", null),      // no art yet
-  widget("f1-timing", "F1 Timing", "saif", "sports", "Live timing through every session.", "f1-timing-dark.png"),
-  widget("f1-hub", "F1 Hub", "saif", "sports", "The race weekend, start to finish.", null),                 // f1-timing.png belongs to F1 Timing
+  widget("f1-timing", "Race Timing", "saif", "sports", "Live timing through every session.", "f1-timing-dark.png"),
+  widget("f1-hub", "Race Hub", "saif", "sports", "The race weekend, start to finish.", null),                 // f1-timing.png belongs to Race Timing
   widget("github", "GitHub", "saif", "developer", "Your profile, streak and contributions.", "github-dark.png"),
   widget("now-playing", "Now Playing", "saif", "media", "Spotify, your browser or Media Player.", "now-playing-dark.png"),
   widget("photo-frame", "Photo Frame", "saif", "media", "A picture from any folder. GIFs too.", "photo-frame.png"),

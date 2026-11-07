@@ -5,7 +5,7 @@ using System.Net;
 using DeskWidgets;
 using DeskWidgets.Widgets;
 
-[DeskWidget(Name = "F1 Timing", Description = "Top five of the latest session, live with OpenF1")]
+[DeskWidget(Name = "Race Timing", Description = "Top five of the latest session, live with OpenF1")]
 public sealed class F1TimingWidget : CardWidget
 {
     const int LiveMs = 6000, IdleMs = 10 * 60 * 1000, LockedMs = 5 * 60 * 1000;
