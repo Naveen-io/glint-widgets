@@ -8,7 +8,7 @@ using System.Linq;
 using DeskWidgets;
 using DeskWidgets.Widgets;
 
-[DeskWidget(Name = "F1 Race Hub", Description = "Next race, its sessions, a countdown and the standings")]
+[DeskWidget(Name = "Race Hub", Description = "Next race, its sessions, a countdown and the standings")]
 public sealed class F1HubWidget : CardWidget
 {
     F1.Weekend next;
