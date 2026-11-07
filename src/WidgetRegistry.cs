@@ -81,6 +81,7 @@ namespace DeskWidgets
         };
 
         static readonly List<WidgetType> types = new List<WidgetType>(BuiltIn);
+        static readonly object typesLock = new object();
 
         // Old built-in type ids that moved to the community gallery. When a community widget
         // registers with the new id, any orphaned config sections still using the old id are
@@ -108,16 +109,16 @@ namespace DeskWidgets
             if (Changed != null) Changed();
         }
 
-        public static IEnumerable<WidgetType> Types { get { return types; } }
+        public static WidgetType[] Types { get { lock (typesLock) return types.ToArray(); } }
 
         public static WidgetType Find(string id)
         {
-            return types.Find(t => t.Id == id);
+            lock (typesLock) return types.Find(t => t.Id == id);
         }
 
         public static WidgetType[] InCategory(string categoryId)
         {
-            return types.Where(t => t.Category == categoryId).ToArray();
+            lock (typesLock) return types.Where(t => t.Category == categoryId).ToArray();
         }
 
         // The old built-in id that should migrate to this community id, or null.
@@ -137,14 +138,17 @@ namespace DeskWidgets
         // Never replaces an existing entry, built-in or not.
         public static bool Register(WidgetType type)
         {
-            if (Find(type.Id) != null) return false;
-            types.Add(type);
-            return true;
+            lock (typesLock)
+            {
+                if (types.Find(t => t.Id == type.Id) != null) return false;
+                types.Add(type);
+                return true;
+            }
         }
 
         public static void Unregister(string id)
         {
-            types.RemoveAll(t => t.Id == id && t.PluginId != null);
+            lock (typesLock) types.RemoveAll(t => t.Id == id && t.PluginId != null);
         }
     }
 }

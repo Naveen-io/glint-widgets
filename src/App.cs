@@ -115,6 +115,7 @@ namespace DeskWidgets
         readonly System.Windows.Forms.Timer updateTimer = new System.Windows.Forms.Timer { Interval = 24 * 60 * 60 * 1000 };
         FileSystemWatcher wallpaperWatcher;
         readonly System.Windows.Forms.Timer wallpaperDebounce = new System.Windows.Forms.Timer { Interval = 50 };
+        readonly System.Windows.Forms.Timer pixelShiftTimer = new System.Windows.Forms.Timer { Interval = 5 * 60 * 1000 };
 
         public App(EventWaitHandle showLibrary, bool openWindow, string url)
         {
@@ -157,7 +158,10 @@ namespace DeskWidgets
             SystemEvents.SessionSwitch += OnSessionSwitch;
             SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
             SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+            DesktopBackdrop.BackdropChanged += delegate { foreach (var w in widgets) w.BackdropChanged(); };
             StartWallpaperWatcher();
+            pixelShiftTimer.Tick += delegate { WidgetWindow.AdvancePixelShift(); foreach (var w in widgets) w.Reposition(); };
+            if (PixelShift) pixelShiftTimer.Start();
             showLibraryWait = ThreadPool.RegisterWaitForSingleObject(showLibrary,
                 delegate { messageWindow.PostOpenLibrary(); }, null, Timeout.Infinite, false);
 
@@ -369,6 +373,7 @@ namespace DeskWidgets
 
         public void RemoveWidget(WidgetWindow w)
         {
+            if (!AlertDialog.Confirm("Remove Widget?", "This widget and its settings will be removed.", "Remove")) return;
             widgets.Remove(w);
             config.Remove(w.Settings);
             w.AnimateRemove();
@@ -730,6 +735,17 @@ namespace DeskWidgets
         // so the app starts earlier and faster at logon, and raises the process priority while running.
         const string TaskName = "DeskWidgets";
 
+        public bool PixelShift
+        {
+            get { return AppSection.GetBool("pixel_shift", false); }
+            set
+            {
+                AppSection.Set("pixel_shift", value);
+                if (value) pixelShiftTimer.Start();
+                else { pixelShiftTimer.Stop(); WidgetWindow.ResetPixelShift(); foreach (var w in widgets) w.Reposition(); }
+            }
+        }
+
         public bool HighPriority
         {
             get { return AppSection.GetBool("high_priority", false); }
@@ -863,6 +879,7 @@ namespace DeskWidgets
             if (library != null) library.Close();
             if (wallpaperWatcher != null) { wallpaperWatcher.EnableRaisingEvents = false; wallpaperWatcher.Dispose(); }
             wallpaperDebounce.Dispose();
+            pixelShiftTimer.Dispose();
             SystemEvents.SessionSwitch -= OnSessionSwitch;
             SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
@@ -872,6 +889,7 @@ namespace DeskWidgets
             tray.Dispose();
             foreach (var w in widgets) w.Dispose();
             widgets.Clear();
+            config.FlushPending();
             ExitThread();
         }
 

@@ -31,7 +31,9 @@ namespace DeskWidgets
             Font = Theme.Footnote;
 
             int pad = Px(20), width = Px(340), inner = width - pad * 2, y = pad;
-            var icon = new PictureBox { Image = IconImage(Px(48)), SizeMode = PictureBoxSizeMode.Zoom };
+            var iconBmp = IconImage(Px(48));
+            var icon = new PictureBox { Image = iconBmp, SizeMode = PictureBoxSizeMode.Zoom };
+            icon.Disposed += delegate { iconBmp.Dispose(); };
             icon.SetBounds((width - Px(48)) / 2, y, Px(48), Px(48));
             Controls.Add(icon);
             y += Px(48) + Px(12);

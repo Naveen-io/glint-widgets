@@ -36,7 +36,7 @@ namespace DeskWidgets
         readonly List<PluginRow> turnedOff = new List<PluginRow>();
         readonly List<SidebarItem> nav = new List<SidebarItem>();
         readonly SidebarItem settings, account;
-        SidebarItem startupToggle, highPriorityToggle;
+        SidebarItem startupToggle, highPriorityToggle, pixelShiftToggle;
         Label settingsAppearanceLabel;
         SidebarItem[] themeItems;
         Label updateLabel, updateStatus;
@@ -267,6 +267,7 @@ namespace DeskWidgets
             // Settings page controls.
             startupToggle.Visible = settingsOpen;
             highPriorityToggle.Visible = settingsOpen;
+            pixelShiftToggle.Visible = settingsOpen;
             settingsAppearanceLabel.Visible = settingsOpen;
             updateLabel.Visible = settingsOpen;
             updateRefresh.Visible = settingsOpen;
@@ -369,6 +370,15 @@ namespace DeskWidgets
             };
             content.Controls.Add(highPriorityToggle);
 
+            pixelShiftToggle = new SidebarItem('', "OLED Pixel Shift") { Toggle = true, On = App.Current.PixelShift };
+            pixelShiftToggle.Click += delegate
+            {
+                App.Current.PixelShift = !App.Current.PixelShift;
+                pixelShiftToggle.On = App.Current.PixelShift;
+                pixelShiftToggle.Invalidate();
+            };
+            content.Controls.Add(pixelShiftToggle);
+
             settingsAppearanceLabel = new Label { Text = "Appearance", Font = Theme.CaptionEmphasized, ForeColor = Theme.Label2, AutoSize = true };
             content.Controls.Add(settingsAppearanceLabel);
 
@@ -441,6 +451,8 @@ namespace DeskWidgets
             startupToggle.SetBounds(pad, y, rowW, Px(44));
             y += Px(44);
             highPriorityToggle.SetBounds(pad, y, rowW, Px(44));
+            y += Px(44);
+            pixelShiftToggle.SetBounds(pad, y, rowW, Px(44));
             y += Px(44) + Px(24);
 
             settingsAppearanceLabel.Location = new Point(pad, y);
@@ -1205,7 +1217,8 @@ namespace DeskWidgets
             EndDrag();
             // Dropped outside the library window = place it there.
             Point at = Cursor.Position;
-            if (!FindForm().Bounds.Contains(at)) App.Current.AddWidget(type, at);
+            Form f = FindForm();
+            if (f != null && !f.Bounds.Contains(at)) App.Current.AddWidget(type, at);
         }
 
         protected override void OnDoubleClick(EventArgs e)

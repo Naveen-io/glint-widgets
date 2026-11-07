@@ -352,7 +352,7 @@ namespace DeskWidgets
                      ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
             Font = Theme.Body;
             Cursor = Cursors.Hand;
-            Height = new TextBox { Font = Theme.Body }.PreferredHeight + WidgetWindow.Px(14);
+            using (var tb = new TextBox { Font = Theme.Body }) Height = tb.PreferredHeight + WidgetWindow.Px(14);
             TabStop = true;
         }
 

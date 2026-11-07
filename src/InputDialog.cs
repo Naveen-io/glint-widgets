@@ -77,9 +77,11 @@ namespace DeskWidgets
         {
             if (!fadingOut && Opacity > 0)
             {
+                // Save before cancel resets it to None.
+                var result = DialogResult;
                 e.Cancel = true;
                 fadingOut = true;
-                Anim.Run(1f, 0f, 120, delegate(float v) { if (!IsDisposed) Opacity = v; }, delegate { if (!IsDisposed) Close(); });
+                Anim.Run(1f, 0f, 120, delegate(float v) { if (!IsDisposed) Opacity = v; }, delegate { if (!IsDisposed) { DialogResult = result; Close(); } });
                 return;
             }
             base.OnFormClosing(e);

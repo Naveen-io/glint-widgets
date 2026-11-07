@@ -125,6 +125,8 @@ namespace DeskWidgets
             Save();
         }
 
+        bool savePending;
+
         public void Save()
         {
             var sb = new StringBuilder();
@@ -134,13 +136,28 @@ namespace DeskWidgets
                 foreach (var kv in s.Values) sb.Append(kv.Key).Append('=').Append(kv.Value).Append("\r\n");
                 sb.Append("\r\n");
             }
-            try
+            string dir = Path.GetDirectoryName(path);
+            string tmp = path + ".tmp";
+            for (int attempt = 0; attempt < 3; attempt++)
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(path));
-                File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
+                try
+                {
+                    Directory.CreateDirectory(dir);
+                    File.WriteAllText(tmp, sb.ToString(), Encoding.UTF8);
+                    if (File.Exists(path)) File.Delete(path);
+                    File.Move(tmp, path);
+                    savePending = false;
+                    return;
+                }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+                System.Threading.Thread.Sleep(50);
             }
-            catch (IOException) { } // e.g. OneDrive briefly locking the file; next change re-saves
-            catch (UnauthorizedAccessException) { }
+            savePending = true;
         }
+
+        public bool HasPendingSave { get { return savePending; } }
+
+        public void FlushPending() { if (savePending) Save(); }
     }
 }
