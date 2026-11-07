@@ -76,39 +76,43 @@ namespace DeskWidgets
             if (h != null) h();
         }
 
-        // Null when nothing is playing.
+        // Null when nothing is playing or the session was replaced mid-read.
         public Snapshot Read()
         {
             GlobalSystemMediaTransportControlsSession s;
             lock (gate) s = session;
             if (s == null) return null;
-            var props = Wait(s.TryGetMediaPropertiesAsync());
-            var playback = s.GetPlaybackInfo();
-            var timeline = s.GetTimelineProperties();
-            var snap = new Snapshot
+            try
             {
-                Title = props.Title ?? "", Artist = props.Artist ?? props.AlbumArtist ?? "", App = AppName(s.SourceAppUserModelId),
-                Playing = playback.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,
-                CanPrevious = playback.Controls.IsPreviousEnabled, CanNext = playback.Controls.IsNextEnabled,
-                Position = timeline.Position, Duration = timeline.EndTime - timeline.StartTime,
-                PositionAtUtc = timeline.LastUpdatedTime.UtcDateTime
-            };
-            if (props.Thumbnail != null)
-            {
-                try
+                var props = Wait(s.TryGetMediaPropertiesAsync());
+                var playback = s.GetPlaybackInfo();
+                var timeline = s.GetTimelineProperties();
+                var snap = new Snapshot
                 {
-                    using (var ras = Wait(props.Thumbnail.OpenReadAsync()))
-                    using (var reader = new DataReader(ras.GetInputStreamAt(0)))
+                    Title = props.Title ?? "", Artist = props.Artist ?? props.AlbumArtist ?? "", App = AppName(s.SourceAppUserModelId),
+                    Playing = playback.PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing,
+                    CanPrevious = playback.Controls.IsPreviousEnabled, CanNext = playback.Controls.IsNextEnabled,
+                    Position = timeline.Position, Duration = timeline.EndTime - timeline.StartTime,
+                    PositionAtUtc = timeline.LastUpdatedTime.UtcDateTime
+                };
+                if (props.Thumbnail != null)
+                {
+                    try
                     {
-                        uint size = (uint)Math.Min(ras.Size, 8 * 1024 * 1024);
-                        uint got = Wait(reader.LoadAsync(size));
-                        snap.Art = new byte[got];
-                        reader.ReadBytes(snap.Art);
+                        using (var ras = Wait(props.Thumbnail.OpenReadAsync()))
+                        using (var reader = new DataReader(ras.GetInputStreamAt(0)))
+                        {
+                            uint size = (uint)Math.Min(ras.Size, 8 * 1024 * 1024);
+                            uint got = Wait(reader.LoadAsync(size));
+                            snap.Art = new byte[got];
+                            reader.ReadBytes(snap.Art);
+                        }
                     }
+                    catch (Exception) { }
                 }
-                catch (Exception) { } // no art is fine
+                return snap;
             }
-            return snap;
+            catch (Exception) { return null; }
         }
 
         public void PlayPause() { Send(s => s.TryTogglePlayPauseAsync()); }

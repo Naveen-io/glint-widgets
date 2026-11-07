@@ -30,6 +30,9 @@ namespace DeskWidgets
         float animatedOpacity = -1;
         int prevOpacityTarget = -1;
         Anim opacityAnim;
+        bool rendering;
+
+        static int shiftX, shiftY;
 
         protected WidgetWindow(Section settings)
         {
@@ -149,7 +152,8 @@ namespace DeskWidgets
 
         public void Render()
         {
-            if (!IsHandleCreated || IsDisposed || paused) return;
+            if (!IsHandleCreated || IsDisposed || paused || rendering) return;
+            rendering = true;
             Size sz = GetSize();
             if (surface == null || surface.Width != sz.Width || surface.Height != sz.Height)
             {
@@ -187,14 +191,16 @@ namespace DeskWidgets
 
             int targetByte = OpacityPercent * 255 / 100;
             if (animatedOpacity < 0) animatedOpacity = targetByte;
-            if (prevOpacityTarget >= 0 && targetByte != prevOpacityTarget && opacityAnim == null)
+            if (prevOpacityTarget >= 0 && targetByte != prevOpacityTarget)
             {
+                if (opacityAnim != null) { opacityAnim.Cancel(); opacityAnim = null; }
                 float start = animatedOpacity;
+                prevOpacityTarget = targetByte;
                 opacityAnim = Anim.Run(start, targetByte, 200,
                     delegate(float v) { animatedOpacity = v; if (IsHandleCreated && !IsDisposed && !paused) Render(); },
                     delegate { opacityAnim = null; });
             }
-            prevOpacityTarget = targetByte;
+            else prevOpacityTarget = targetByte;
 
             byte finalOpacity = (byte)Math.Max(0, Math.Min(255, animatedOpacity));
             if (appearProgress < 1f)
@@ -202,6 +208,7 @@ namespace DeskWidgets
 
             surface.Present(Handle, finalOpacity);
 
+            rendering = false;
             int delay = NextFrameDelay();
             if (delay >= 0)
             {
@@ -244,9 +251,10 @@ namespace DeskWidgets
         {
             if (lockFlashAnim != null) lockFlashAnim.Cancel();
             lockFlash = 1f;
+            Cursor = Cursors.No;
             lockFlashAnim = Anim.Run(1f, 0f, 500,
                 delegate(float v) { lockFlash = v; if (IsHandleCreated && !IsDisposed) Render(); },
-                delegate { lockFlashAnim = null; });
+                delegate { lockFlashAnim = null; if (IsHandleCreated && !IsDisposed) Cursor = Cursors.Default; });
         }
 
         internal void SetPaused(bool value)
@@ -380,6 +388,23 @@ namespace DeskWidgets
             if (IsHandleCreated) PlaceOnScreen();
         }
 
+        // Pixel shift for OLED burn-in prevention: cycles through a 3×3 grid of ±2px offsets.
+        static readonly int[] ShiftPattern = { 0, 1, 2, 1, 0, -1, -2, -1 };
+        static int shiftStep;
+
+        public static void AdvancePixelShift()
+        {
+            shiftStep = (shiftStep + 1) % (ShiftPattern.Length * ShiftPattern.Length);
+            shiftX = ShiftPattern[shiftStep % ShiftPattern.Length];
+            shiftY = ShiftPattern[shiftStep / ShiftPattern.Length];
+        }
+
+        public static void ResetPixelShift()
+        {
+            shiftStep = 0;
+            shiftX = shiftY = 0;
+        }
+
         static float Fraction(int offset, int range)
         {
             return range <= 0 ? 0f : Math.Max(0f, Math.Min(1f, offset / (float)range));
@@ -401,8 +426,8 @@ namespace DeskWidgets
             string device = Settings.Get("screen", "");
             Screen screen = Screen.AllScreens.FirstOrDefault(s => s.DeviceName == device) ?? Screen.PrimaryScreen;
             Rectangle wa = screen.WorkingArea;
-            Location = new Point(wa.Left + (int)Math.Round(fx * (wa.Width - sz.Width)),
-                                 wa.Top + (int)Math.Round(fy * (wa.Height - sz.Height)));
+            Location = new Point(wa.Left + (int)Math.Round(fx * (wa.Width - sz.Width)) + shiftX,
+                                 wa.Top + (int)Math.Round(fy * (wa.Height - sz.Height)) + shiftY);
         }
 
         // Renders the widget into a new bitmap (used for library previews and the drag ghost).
@@ -504,8 +529,8 @@ namespace DeskWidgets
                     newH = side;
                 }
 
-                Settings.Set("custom_w", newW);
-                Settings.Set("custom_h", newH);
+                Settings.Values["custom_w"] = newW.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                Settings.Values["custom_h"] = newH.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 Location = new Point(newX, newY);
                 Render();
                 return;
@@ -526,9 +551,10 @@ namespace DeskWidgets
             // Only drag while the left button is really held: a press whose release we never saw
             // (a dialog opened, the release happened elsewhere) must not turn a later hover into a drag.
             if ((MouseButtons & MouseButtons.Left) == 0) pressed = false;
-            if (!pressed || Locked || IsButton(pressedAt)) return;
+            if (!pressed || IsButton(pressedAt)) return;
             Size slop = SystemInformation.DragSize;
             if (Math.Abs(e.X - pressedAt.X) < slop.Width && Math.Abs(e.Y - pressedAt.Y) < slop.Height) return;
+            if (Locked) { pressed = false; FlashLock(); return; }
             pressed = false;
             lifted = true;
             Render();
@@ -543,6 +569,8 @@ namespace DeskWidgets
             if (resizeCorner != Corner.None && e.Button == MouseButtons.Left)
             {
                 Capture = false;
+                Settings.Set("custom_w", Settings.GetInt("custom_w", 0));
+                Settings.Set("custom_h", Settings.GetInt("custom_h", 0));
                 OnResized(Size.Width, Size.Height);
                 MoveTo(Location);
                 resizeCorner = Corner.None;
@@ -588,6 +616,9 @@ namespace DeskWidgets
         {
             if (disposing)
             {
+                if (opacityAnim != null) { opacityAnim.Cancel(); opacityAnim = null; }
+                if (appearAnim != null) { appearAnim.Cancel(); appearAnim = null; }
+                if (lockFlashAnim != null) { lockFlashAnim.Cancel(); lockFlashAnim = null; }
                 timer.Dispose();
                 if (surface != null) { surface.Dispose(); surface = null; }
             }

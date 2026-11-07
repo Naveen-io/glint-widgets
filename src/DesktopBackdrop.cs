@@ -21,6 +21,8 @@ namespace DeskWidgets
         static Bitmap map;
         static Rectangle virt;
         static bool built;
+        static bool building;
+        public static event Action BackdropChanged;
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
         static extern bool SystemParametersInfo(int action, int param, StringBuilder value, int winIni);
@@ -41,7 +43,11 @@ namespace DeskWidgets
             bmp.SetResolution(96, 96);
             using (var g = Graphics.FromImage(bmp))
             {
-                if (!screenRect.IsEmpty && !built) Build();
+                if (!screenRect.IsEmpty && !built && !building)
+                {
+                    building = true;
+                    RebuildAsync(delegate(Bitmap b, Rectangle r) { App.RunOnUi(delegate { Apply(b, r); building = false; if (BackdropChanged != null) BackdropChanged(); }); });
+                }
                 if (screenRect.IsEmpty || map == null)
                 {
                     using (var b = new LinearGradientBrush(new Point(0, 0), new Point(bmp.Width, bmp.Height), Color.FromArgb(70, 108, 120), Color.FromArgb(150, 120, 90)))
@@ -85,19 +91,6 @@ namespace DeskWidgets
             built = true;
         }
 
-        // Synchronous first-time build (called lazily from Blurred on the first render).
-        static void Build()
-        {
-            built = true;
-            virt = SystemInformation.VirtualScreen;
-            try
-            {
-                var newMap = BuildCore(virt, Screen.AllScreens);
-                if (map != null) map.Dispose();
-                map = newMap;
-            }
-            catch { }
-        }
 
         static Bitmap BuildCore(Rectangle virtRect, Screen[] screens)
         {

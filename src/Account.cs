@@ -134,7 +134,7 @@ namespace DeskWidgets
                 if (Photo != null) { Photo.Dispose(); Photo = null; }
                 Save();
             }
-            if (Changed != null) Changed();
+            App.RunOnUi(delegate { if (Changed != null) Changed(); });
         }
 
         // A current access token, refreshed when it's about to expire. Throws when the sign-in ended

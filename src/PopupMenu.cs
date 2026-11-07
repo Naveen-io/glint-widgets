@@ -110,12 +110,14 @@ namespace DeskWidgets
             if (previous != IntPtr.Zero) Native.SendMessage(previous, Native.WM_NCACTIVATE, (IntPtr)1, IntPtr.Zero);
         }
 
+        static readonly uint ourPid = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
+
         static bool IsOurs(IntPtr hwnd)
         {
             if (hwnd == IntPtr.Zero) return false;
             uint pid;
             Native.GetWindowThreadProcessId(hwnd, out pid);
-            return pid == (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
+            return pid == ourPid;
         }
 
         MenuLevel Deepest { get { return levels[levels.Count - 1]; } }

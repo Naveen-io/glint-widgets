@@ -17,6 +17,7 @@ namespace DeskWidgets
         readonly int targetY;
         byte fadeOpacity;
         Anim anim;
+        bool dismissing;
 
         Toast(string title, string message)
         {
@@ -98,6 +99,8 @@ namespace DeskWidgets
 
         void Dismiss()
         {
+            if (dismissing) return;
+            dismissing = true;
             autoDismiss.Stop();
             if (anim != null) anim.Cancel();
             anim = Anim.Run(fadeOpacity, 0f, 200, delegate(float v)
@@ -117,7 +120,7 @@ namespace DeskWidgets
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) { autoDismiss.Dispose(); surface.Dispose(); }
+            if (disposing) { if (anim != null) { anim.Cancel(); anim = null; } autoDismiss.Dispose(); surface.Dispose(); }
             base.Dispose(disposing);
         }
 

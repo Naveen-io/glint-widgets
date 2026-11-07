@@ -36,7 +36,7 @@ namespace DeskWidgets
         readonly List<PluginRow> turnedOff = new List<PluginRow>();
         readonly List<SidebarItem> nav = new List<SidebarItem>();
         readonly SidebarItem settings, account;
-        SidebarItem startupToggle, highPriorityToggle;
+        SidebarItem startupToggle, highPriorityToggle, pixelShiftToggle;
         Label settingsAppearanceLabel;
         SidebarItem[] themeItems;
         Label updateLabel, updateStatus;
@@ -267,6 +267,7 @@ namespace DeskWidgets
             // Settings page controls.
             startupToggle.Visible = settingsOpen;
             highPriorityToggle.Visible = settingsOpen;
+            pixelShiftToggle.Visible = settingsOpen;
             settingsAppearanceLabel.Visible = settingsOpen;
             updateLabel.Visible = settingsOpen;
             updateRefresh.Visible = settingsOpen;
@@ -349,7 +350,7 @@ namespace DeskWidgets
 
         void BuildSettingsControls()
         {
-            startupToggle = new SidebarItem('', "Start with Windows") { Toggle = true, On = App.StartWithWindows };
+            startupToggle = new SidebarItem('', "Start with Windows") { Toggle = true, On = App.StartWithWindows, Subtitle = "Launch quietly when you sign in" };
             startupToggle.Click += delegate
             {
                 bool on = !startupToggle.On;
@@ -360,7 +361,7 @@ namespace DeskWidgets
             };
             content.Controls.Add(startupToggle);
 
-            highPriorityToggle = new SidebarItem('', "High Priority") { Toggle = true, On = App.Current.HighPriority };
+            highPriorityToggle = new SidebarItem('', "High Priority") { Toggle = true, On = App.Current.HighPriority, Subtitle = "Start faster at login and raise CPU priority" };
             highPriorityToggle.Click += delegate
             {
                 App.Current.HighPriority = !App.Current.HighPriority;
@@ -369,17 +370,27 @@ namespace DeskWidgets
             };
             content.Controls.Add(highPriorityToggle);
 
+            pixelShiftToggle = new SidebarItem('', "OLED Pixel Shift") { Toggle = true, On = App.Current.PixelShift, Subtitle = "Move widgets a few pixels to prevent burn-in" };
+            pixelShiftToggle.Click += delegate
+            {
+                App.Current.PixelShift = !App.Current.PixelShift;
+                pixelShiftToggle.On = App.Current.PixelShift;
+                pixelShiftToggle.Invalidate();
+            };
+            content.Controls.Add(pixelShiftToggle);
+
             settingsAppearanceLabel = new Label { Text = "Appearance", Font = Theme.CaptionEmphasized, ForeColor = Theme.Label2, AutoSize = true };
             content.Controls.Add(settingsAppearanceLabel);
 
             string[] labels = { "System", "Light", "Dark" };
+            string[] subtitles = { "Follows your Windows theme", "Always light", "Always dark" };
             AppTheme[] values = { AppTheme.System, AppTheme.Light, AppTheme.Dark };
             themeItems = new SidebarItem[labels.Length];
             for (int i = 0; i < labels.Length; i++)
             {
                 int idx = i;
                 bool active = App.Current.AppThemeChoice == values[i];
-                var item = new SidebarItem(active ? '' : '\0', labels[i]) { Selected = active };
+                var item = new SidebarItem(active ? '' : '\0', labels[i]) { Selected = active, Subtitle = subtitles[i] };
                 item.Click += delegate
                 {
                     App.Current.AppThemeChoice = values[idx];
@@ -438,17 +449,19 @@ namespace DeskWidgets
         {
             int rowW = Math.Min(width, Px(500));
 
-            startupToggle.SetBounds(pad, y, rowW, Px(44));
-            y += Px(44);
-            highPriorityToggle.SetBounds(pad, y, rowW, Px(44));
-            y += Px(44) + Px(24);
+            startupToggle.SetBounds(pad, y, rowW, Px(52));
+            y += Px(52);
+            highPriorityToggle.SetBounds(pad, y, rowW, Px(52));
+            y += Px(52);
+            pixelShiftToggle.SetBounds(pad, y, rowW, Px(52));
+            y += Px(52) + Px(24);
 
             settingsAppearanceLabel.Location = new Point(pad, y);
             y += settingsAppearanceLabel.Height + Px(8);
             for (int i = 0; i < themeItems.Length; i++)
             {
-                themeItems[i].SetBounds(pad, y, rowW, Px(38));
-                y += Px(38);
+                themeItems[i].SetBounds(pad, y, rowW, Px(46));
+                y += Px(46);
             }
             y += Px(24);
 
@@ -748,6 +761,7 @@ namespace DeskWidgets
     sealed class SidebarItem : PaintedControl
     {
         public char Glyph;
+        public string Subtitle;
         public bool Toggle;
         public Bitmap Photo;
 
@@ -827,8 +841,19 @@ namespace DeskWidgets
             }
             else
                 TextRenderer.DrawText(g, Glyph.ToString(), Theme.Icons, new Rectangle(Px(12), 0, Px(20), Height), Theme.Link, flags);
-            TextRenderer.DrawText(g, Text, selectedValue ? Theme.Font(14, 600) : Theme.Font(14),
-                new Rectangle(Px(42), 0, Width - Px(46) - (Toggle ? Px(44) : 0), Height), Theme.Label, flags | TextFormatFlags.EndEllipsis);
+            bool hasSub = !string.IsNullOrEmpty(Subtitle);
+            int textW = Width - Px(46) - (Toggle ? Px(44) : 0);
+            if (hasSub)
+            {
+                int top = (Height - Px(16) - Px(14)) / 2;
+                TextRenderer.DrawText(g, Text, selectedValue ? Theme.Font(14, 600) : Theme.Font(14),
+                    new Rectangle(Px(42), top, textW, Px(18)), Theme.Label, TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+                TextRenderer.DrawText(g, Subtitle, Theme.Caption,
+                    new Rectangle(Px(42), top + Px(18), textW, Px(14)), Theme.Label2, TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis);
+            }
+            else
+                TextRenderer.DrawText(g, Text, selectedValue ? Theme.Font(14, 600) : Theme.Font(14),
+                    new Rectangle(Px(42), 0, textW, Height), Theme.Label, flags | TextFormatFlags.EndEllipsis);
 
             if (Toggle)
             {
@@ -1205,13 +1230,15 @@ namespace DeskWidgets
             EndDrag();
             // Dropped outside the library window = place it there.
             Point at = Cursor.Position;
-            if (!FindForm().Bounds.Contains(at)) App.Current.AddWidget(type, at);
+            Form f = FindForm();
+            if (f != null && !f.Bounds.Contains(at)) App.Current.AddWidget(type, at);
         }
 
         protected override void OnDoubleClick(EventArgs e)
         {
             base.OnDoubleClick(e);
             App.Current.AddWidget(type, null);
+            Toast.Show("Widget Added", type.Name + " has been placed on your desktop.");
         }
 
         void EndDrag()

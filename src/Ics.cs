@@ -33,7 +33,9 @@ namespace DeskWidgets
                 if (line == "BEGIN:VEVENT") { ev = new Dictionary<string, Prop>(); exdates = new List<string>(); continue; }
                 if (line == "END:VEVENT")
                 {
-                    if (ev != null) Expand(ev, exdates, from, to, calendar, events);
+                    if (ev != null)
+                        try { Expand(ev, exdates, from, to, calendar, events); }
+                        catch (Exception) { } // skip malformed events instead of losing the whole feed
                     ev = null;
                     continue;
                 }
@@ -84,8 +86,9 @@ namespace DeskWidgets
                               .ToDictionary(kv => kv[0].ToUpperInvariant(), kv => kv[1].ToUpperInvariant());
             string freq;
             if (!rule.TryGetValue("FREQ", out freq)) { add(s); return; }
-            int interval = rule.ContainsKey("INTERVAL") ? Math.Max(1, int.Parse(rule["INTERVAL"], CultureInfo.InvariantCulture)) : 1;
-            int count = rule.ContainsKey("COUNT") ? int.Parse(rule["COUNT"], CultureInfo.InvariantCulture) : int.MaxValue;
+            int iv, ct;
+            int interval = rule.ContainsKey("INTERVAL") && int.TryParse(rule["INTERVAL"], NumberStyles.Integer, CultureInfo.InvariantCulture, out iv) ? Math.Max(1, iv) : 1;
+            int count = rule.ContainsKey("COUNT") && int.TryParse(rule["COUNT"], NumberStyles.Integer, CultureInfo.InvariantCulture, out ct) ? ct : int.MaxValue;
             DateTime until = DateTime.MaxValue;
             if (rule.ContainsKey("UNTIL")) { bool a; until = ParseTime("", rule["UNTIL"], out a); if (a) until = until.AddDays(1).AddTicks(-1); }
             var byDay = rule.ContainsKey("BYDAY")
@@ -143,10 +146,17 @@ namespace DeskWidgets
         static DateTime ParseTime(string prms, string value, out bool allDay)
         {
             value = value.Trim();
-            allDay = value.Length == 8; // VALUE=DATE: yyyyMMdd with no time part
-            if (allDay) return DateTime.ParseExact(value, "yyyyMMdd", CultureInfo.InvariantCulture);
+            allDay = value.Length == 8;
+            DateTime parsed;
+            if (allDay)
+            {
+                if (DateTime.TryParseExact(value, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out parsed)) return parsed;
+                throw new FormatException("Bad ICS date: " + value);
+            }
             bool utc = value.EndsWith("Z", StringComparison.OrdinalIgnoreCase);
-            DateTime t = DateTime.ParseExact(value.TrimEnd('Z', 'z').Substring(0, 15), "yyyyMMdd'T'HHmmss", CultureInfo.InvariantCulture);
+            string raw = value.TrimEnd('Z', 'z');
+            if (raw.Length < 15) throw new FormatException("Bad ICS datetime: " + value);
+            DateTime t = DateTime.ParseExact(raw.Substring(0, 15), "yyyyMMdd'T'HHmmss", CultureInfo.InvariantCulture);
             if (utc) return DateTime.SpecifyKind(t, DateTimeKind.Utc).ToLocalTime();
             string tzid = Param(prms, "TZID");
             TimeZoneInfo zone = tzid == null ? null : FindZone(tzid);

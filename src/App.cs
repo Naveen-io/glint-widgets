@@ -115,6 +115,7 @@ namespace DeskWidgets
         readonly System.Windows.Forms.Timer updateTimer = new System.Windows.Forms.Timer { Interval = 24 * 60 * 60 * 1000 };
         FileSystemWatcher wallpaperWatcher;
         readonly System.Windows.Forms.Timer wallpaperDebounce = new System.Windows.Forms.Timer { Interval = 50 };
+        readonly System.Windows.Forms.Timer pixelShiftTimer = new System.Windows.Forms.Timer { Interval = 5 * 60 * 1000 };
 
         public App(EventWaitHandle showLibrary, bool openWindow, string url)
         {
@@ -157,7 +158,10 @@ namespace DeskWidgets
             SystemEvents.SessionSwitch += OnSessionSwitch;
             SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
             SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+            DesktopBackdrop.BackdropChanged += delegate { foreach (var w in widgets.ToArray()) w.BackdropChanged(); };
             StartWallpaperWatcher();
+            pixelShiftTimer.Tick += delegate { WidgetWindow.AdvancePixelShift(); foreach (var w in widgets.ToArray()) w.Reposition(); };
+            if (PixelShift) pixelShiftTimer.Start();
             showLibraryWait = ThreadPool.RegisterWaitForSingleObject(showLibrary,
                 delegate { messageWindow.PostOpenLibrary(); }, null, Timeout.Infinite, false);
 
@@ -369,6 +373,7 @@ namespace DeskWidgets
 
         public void RemoveWidget(WidgetWindow w)
         {
+            if (!AlertDialog.Confirm("Remove Widget?", "This widget and its settings will be removed.", "Remove")) return;
             widgets.Remove(w);
             config.Remove(w.Settings);
             w.AnimateRemove();
@@ -639,14 +644,14 @@ namespace DeskWidgets
         {
             if (e.Reason != SessionSwitchReason.SessionLock && e.Reason != SessionSwitchReason.SessionUnlock) return;
             bool locked = e.Reason == SessionSwitchReason.SessionLock;
-            foreach (var w in widgets) w.SetPaused(locked);
+            foreach (var w in widgets.ToArray()) w.SetPaused(locked);
         }
 
         // Resolution/monitor changed: re-apply each widget's relative position.
         void OnDisplaySettingsChanged(object sender, EventArgs e)
         {
             DesktopBackdrop.Invalidate();
-            foreach (var w in widgets) { w.Reposition(); w.BackdropChanged(); }
+            foreach (var w in widgets.ToArray()) { w.Reposition(); w.BackdropChanged(); }
         }
 
         // New wallpaper: vibrant widgets re-sample what's behind them.
@@ -663,7 +668,7 @@ namespace DeskWidgets
                 RunOnUi(delegate
                 {
                     DesktopBackdrop.Apply(newMap, newVirt);
-                    foreach (var w in widgets) w.BackdropChanged();
+                    foreach (var w in widgets.ToArray()) w.BackdropChanged();
                 });
             });
         }
@@ -729,6 +734,17 @@ namespace DeskWidgets
         // High Priority: uses Task Scheduler (priority 4 = Above Normal) instead of the Run registry
         // so the app starts earlier and faster at logon, and raises the process priority while running.
         const string TaskName = "DeskWidgets";
+
+        public bool PixelShift
+        {
+            get { return AppSection.GetBool("pixel_shift", false); }
+            set
+            {
+                AppSection.Set("pixel_shift", value);
+                if (value) pixelShiftTimer.Start();
+                else { pixelShiftTimer.Stop(); WidgetWindow.ResetPixelShift(); foreach (var w in widgets.ToArray()) w.Reposition(); }
+            }
+        }
 
         public bool HighPriority
         {
@@ -863,6 +879,7 @@ namespace DeskWidgets
             if (library != null) library.Close();
             if (wallpaperWatcher != null) { wallpaperWatcher.EnableRaisingEvents = false; wallpaperWatcher.Dispose(); }
             wallpaperDebounce.Dispose();
+            pixelShiftTimer.Dispose();
             SystemEvents.SessionSwitch -= OnSessionSwitch;
             SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
             SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
@@ -872,6 +889,7 @@ namespace DeskWidgets
             tray.Dispose();
             foreach (var w in widgets) w.Dispose();
             widgets.Clear();
+            config.FlushPending();
             ExitThread();
         }
 

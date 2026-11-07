@@ -52,9 +52,10 @@ Single-process, single-exe WinForms app. No designer files — all UI is hand-co
   drag-to-move, right-click menus, render loop, DPI scaling. Community plugins derive from this.
 - **`CardWidget.cs`** (in `DeskWidgets.Widgets` namespace) — abstract base for Apple-style card
   widgets. Provides Dark/Light/Vibrant palettes, small/medium/large sizes, frosted backdrop,
-  font caching, emoji rendering, drawing helpers. Most built-in widgets extend this.
+  font caching, emoji rendering, drawing helpers. Community widgets extend this.
 - **`WidgetRegistry.cs`** — static catalog of `WidgetType` entries grouped by `WidgetCategory`.
-  Built-in widgets go in the `BuiltIn` array; community widgets are added/removed at runtime via
+  The only built-in widget is the analog clock; everything else is a community widget
+  installed from the gallery. Community widgets are added/removed at runtime via
   `Register`/`Unregister`.
 - **`LibraryWindow.cs`** — the main app window (sidebar + grid of cards). Only exists while open.
   Also defines the painted controls: `SidebarItem`, `WidgetCard`, `ExploreCard`, `PluginRow`, etc.
@@ -109,11 +110,12 @@ Apple's widget specs: small 170 x 170 pt, medium 364 x 170 pt, large 364 x 382 p
 radius, 16 pt margins. Sizes scale with DPI via `P(pt)` in CardWidget or `Px(logical)` in
 WidgetWindow.
 
-## Adding a new built-in widget
+## Widgets
 
-1. Create `src/Widgets/MyWidget.cs` — derive from `CardWidget` (cards) or `WidgetWindow` (custom).
-2. Register in `WidgetRegistry.cs` with category, name, description.
-3. `build.bat` — it appears in the library automatically.
+The only built-in widget is the analog clock (`src/Widgets/AnalogClock.cs`). All other widgets
+(reminders, weather, GitHub, etc.) are community widgets — users install them from the gallery
+on the community page. Community widget source lives in `community/` for reference but ships
+via Supabase, not in the exe.
 
 ## Settings & data paths
 
