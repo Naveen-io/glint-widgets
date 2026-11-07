@@ -1141,7 +1141,9 @@ namespace DeskWidgets
             Theme.FillRound(g, bg, new RectangleF(0, 0, Width - 1, Height - 1), Px(Theme.RadiusCard));
 
             int boxW = Width - pad * 2, box = Px(176) - pad * 2;
-            float scale = Math.Min(1f, Math.Min(boxW / (float)preview.Width, box / (float)preview.Height));
+            // Fill the box, like WidgetCard above: previews arrive at whatever pixel size the
+            // author's DPI produced, and capping at 1x made the same widget a different size here.
+            float scale = Math.Min(boxW / (float)preview.Width, box / (float)preview.Height);
             int pw = (int)(preview.Width * scale), ph = (int)(preview.Height * scale);
             g.DrawImage(preview, new Rectangle((Width - pw) / 2, pad + (box - ph) / 2, pw, ph));
 
