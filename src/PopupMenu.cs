@@ -124,6 +124,7 @@ namespace DeskWidgets
 
         public void OnMouseMove(Point screen)
         {
+            if (closed || levels.Count == 0) return;
             if (screen == lastPointer) return; // not the hand moving: a window appeared or closed under it
             lastPointer = screen;
             MenuLevel level = levels.LastOrDefault(l => l.Bounds.Contains(screen) && l.BodyContains(screen));
@@ -194,6 +195,7 @@ namespace DeskWidgets
 
         public bool OnKey(Keys key)
         {
+            if (closed || levels.Count == 0) return false;
             MenuLevel level = Deepest;
             switch (key)
             {
