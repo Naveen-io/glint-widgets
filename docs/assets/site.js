@@ -135,7 +135,7 @@ function footer() {
         "Desk Widgets is free and open source. Community widgets are reviewed by a person before they appear here."),
       el("div", { class: "f-cols" },
         column("Widgets", [["explore.html", "Explore"], ["./#catalog", "Built-in widgets"], ["upload.html", "Upload yours"]]),
-        column("App", [[DOWNLOAD_URL, "Download"], [RELEASES_URL, "What's new"]]),
+        column("App", [[DOWNLOAD_URL, "Download"], [RELEASES_URL, "What's new"], ["privacy.html", "Privacy"]]),
         column("Open source", [[REPO_URL, "Source code"], [REPO_URL + "/issues", "Report an issue"],
           [REPO_URL + "/blob/main/samples/HelloWidget.cs", "Write a widget in C#"]])),
       el("p", { class: "f-bottom" },

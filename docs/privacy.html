@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy · Desk Widgets</title>
+  <meta name="description" content="What Desk Widgets stores on your PC, which services each widget contacts, and what never leaves your machine.">
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <main class="content narrow section">
+    <h1 class="t-large">Privacy</h1>
+    <p class="t-reduced">Last updated 8 November 2026.</p>
+
+    <p>Desk Widgets has no analytics, no telemetry and no crash reporting. Nothing is sent
+    anywhere to tell us that you installed it, opened it or used it. There is no account to
+    create unless you want to publish a widget.</p>
+
+    <p>What the app does send is simpler to describe: a widget talks to the service it shows you
+    data from, and only once you have added that widget.</p>
+
+    <h2 class="block">What stays on your PC</h2>
+
+    <p>All of your settings and data are files in your own Windows user folder. They are never
+    uploaded.</p>
+
+    <div class="group" role="list">
+      <div class="row"><div class="main"><div class="t-headline">Your widgets and their settings</div>
+        <div class="t-reduced">%APPDATA%\DeskWidgets\widgets.ini — which widgets you added, where
+        they sit, your city, your tickers, your GitHub username.</div></div></div>
+      <div class="row"><div class="main"><div class="t-headline">Caches</div>
+        <div class="t-reduced">%APPDATA%\DeskWidgets\cache and %LOCALAPPDATA%\DeskWidgets —
+        the last answer from each service, widget previews, and installed community widgets, so
+        the app works offline and starts quickly.</div></div></div>
+      <div class="row"><div class="main"><div class="t-headline">Passwords you give a widget</div>
+        <div class="t-reduced">Encrypted with Windows DPAPI for your Windows account only. They
+        cannot be read by another user on the PC, and they do not work if the file is copied to
+        another machine.</div></div></div>
+    </div>
+
+    <p>Deleting a widget stops its requests. Deleting those folders removes everything the app
+    has kept.</p>
+
+    <h2 class="block">Which services each widget contacts</h2>
+
+    <p>A widget only contacts its service after you add it. Each service sees your IP address,
+    as it would for any website you visit, plus whatever that widget needs to ask for.</p>
+
+    <div class="group" role="list">
+      <div class="row"><div class="main"><div class="t-headline">Weather</div>
+        <div class="t-reduced">open-meteo.com — the place you chose, as a name and coordinates.
+        No account.</div></div></div>
+      <div class="row"><div class="main"><div class="t-headline">GitHub</div>
+        <div class="t-reduced">api.github.com — the GitHub username you entered. Public data
+        only.</div></div></div>
+      <div class="row"><div class="main"><div class="t-headline">Crypto</div>
+        <div class="t-reduced">api.binance.com — the coin you picked. No account.</div></div></div>
+      <div class="row"><div class="main"><div class="t-headline">Watchlist</div>
+        <div class="t-reduced">query1.finance.yahoo.com — the tickers you entered.</div></div></div>
+      <div class="row"><div class="main"><div class="t-headline">Race Hub</div>
+        <div class="t-reduced">api.jolpi.ca — the schedule and standings. Nothing about you is
+        sent beyond the request itself.</div></div></div>
+      <div class="row"><div class="main"><div class="t-headline">Race Timing</div>
+        <div class="t-reduced">livetiming.formula1.com for session data, and api.openf1.org if
+        you choose to connect an OpenF1 account. That account's password is stored encrypted on
+        your PC and sent only to OpenF1.</div></div></div>
+      <div class="row"><div class="main"><div class="t-headline">Mail</div>
+        <div class="t-reduced">mail.google.com — your Gmail address and the Google app password
+        you created, sent to Google only, to read your unread mail. Desk Widgets never sees your
+        normal Google password, and your mail is never sent anywhere else.</div></div></div>
+    </div>
+
+    <h2 class="block">The app itself</h2>
+
+    <div class="group" role="list">
+      <div class="row"><div class="main"><div class="t-headline">Update check</div>
+        <div class="t-reduced">The app asks GitHub for the latest release so it can tell you a
+        new version exists. GitHub sees the request and your IP address.</div></div></div>
+      <div class="row"><div class="main"><div class="t-headline">The widget gallery</div>
+        <div class="t-reduced">Browsing or installing a community widget is a read from our
+        Supabase database. No account is needed, and we keep no record of who installed
+        what.</div></div></div>
+    </div>
+
+    <h2 class="block">If you make an account</h2>
+
+    <p>An account is needed only to publish a widget. It stores your email address, your
+    username, and anything you choose to put in your profile. Sign-in is handled by Supabase, our
+    database provider, which processes your email and password on our behalf.</p>
+
+    <p>When you sign in from the app, the access token is stored encrypted on your PC
+    (%APPDATA%\DeskWidgets\account.dat). In a browser it is kept in that browser's local storage,
+    along with your light or dark theme preference. The site sets no advertising or tracking
+    cookies.</p>
+
+    <p>A widget you publish is public: its name, description, source code and author name are
+    shown to everyone. Your email address is not.</p>
+
+    <h2 class="block">What we never do</h2>
+
+    <p>We do not sell or share your data. We do not build a profile of you, show advertising, or
+    track you across websites. We have no way to see which widgets you use or what any of them
+    display, because that never leaves your PC.</p>
+
+    <h2 class="block">Children</h2>
+
+    <p>Desk Widgets is not directed at children and does not knowingly collect anything from
+    them.</p>
+
+    <h2 class="block">Changes</h2>
+
+    <p>If this policy changes, the date at the top changes with it, and the edit is visible in
+    the project's public history.</p>
+
+    <h2 class="block">Contact</h2>
+
+    <p>Ask anything, or request deletion of an account, by opening an issue at
+    <a href="https://github.com/whoissaaif/desk-widgets/issues">github.com/whoissaaif/desk-widgets/issues</a>.</p>
+  </main>
+
+  <script type="module">
+    import { nav } from "./assets/site.js";
+    nav(null);
+  </script>
+</body>
+</html>
