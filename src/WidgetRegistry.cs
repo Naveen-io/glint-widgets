@@ -78,6 +78,61 @@ namespace DeskWidgets
                 Create = s => new AnalogClock(s),
                 Defaults = s => { s.Set("label", "PAR"); s.Set("tz", "Romance Standard Time"); }
             },
+            new WidgetType
+            {
+                Id = "notes", Category = "productivity", Name = "Quick Notes", Description = "Instant note, click to edit, autosaves",
+                Create = s => new NotesWidget(s)
+            },
+            new WidgetType
+            {
+                Id = "focus-timer", Category = "productivity", Name = "Focus Timer", Description = "Pomodoro countdown ring with sound",
+                Create = s => new FocusTimer(s)
+            },
+            new WidgetType
+            {
+                Id = "system", Category = "system", Name = "System Monitor", Description = "Real-time CPU, RAM, and Disk utilization",
+                Create = s => new SystemWidget(s)
+            },
+            new WidgetType
+            {
+                Id = "calendar", Category = "productivity", Name = "Calendar", Description = "Month view and upcoming events",
+                Create = s => new CalendarWidget(s)
+            },
+            new WidgetType
+            {
+                Id = "reminders", Category = "productivity", Name = "Reminders", Description = "Interactive desktop checklist",
+                Create = s => new RemindersWidget(s)
+            },
+            new WidgetType
+            {
+                Id = "weather", Category = "weather", Name = "Weather", Description = "Current conditions and forecast",
+                Create = s => new WeatherWidget(s)
+            },
+            new WidgetType
+            {
+                Id = "photo-frame", Category = "media", Name = "Photo Frame", Description = "Rotating photos from a folder",
+                Create = s => new PhotoFrame(s)
+            },
+            new WidgetType
+            {
+                Id = "now-playing", Category = "media", Name = "Now Playing", Description = "Media controls and album art",
+                Create = s => new NowPlayingWidget(s)
+            },
+            new WidgetType
+            {
+                Id = "launcher", Category = "utility", Name = "Quick Launcher", Description = "Instant access to system utilities and apps",
+                Create = s => new LauncherWidget(s)
+            },
+            new WidgetType
+            {
+                Id = "calculator", Category = "utility", Name = "Calculator", Description = "Minimalist desk calculator with immediate feedback",
+                Create = s => new CalculatorWidget(s)
+            },
+            new WidgetType
+            {
+                Id = "clipboard", Category = "utility", Name = "Clipboard", Description = "Recent text clips ready to re-copy in one click",
+                Create = s => new ClipboardWidget(s)
+            },
         };
 
         static readonly List<WidgetType> types = new List<WidgetType>(BuiltIn);

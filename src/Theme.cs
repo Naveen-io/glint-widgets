@@ -8,9 +8,6 @@ namespace DeskWidgets
 {
     enum AppTheme { System, Light, Dark }
 
-    // design/apple-design.md as the app's own UI uses it (library window, dialogs, menus). Every
-    // color, font and radius comes from here. Light and dark follow the Windows app theme, the way
-    // Apple apps follow the system appearance. Widgets have their own palettes in CardWidget.
     static class Theme
     {
         static bool dark = ReadDark();
@@ -27,7 +24,6 @@ namespace DeskWidgets
             }
         }
 
-        // Raised when Windows switches between light and dark.
         public static event Action Changed;
 
         public static void Refresh()
@@ -49,32 +45,37 @@ namespace DeskWidgets
         static Color Pick(int light, int darkRgb) { return Rgb(dark ? darkRgb : light); }
         public static Color Rgb(int rgb) { return Color.FromArgb(unchecked((int)0xFF000000) | rgb); }
 
-        // ---- color (§4, web apps §2.9) ----
-        public static Color WindowBg { get { return Pick(0xFFFFFF, 0x1F1F1F); } }
-        public static Color SidebarBg { get { return Pick(0xF5F5F7, 0x262628); } }
-        public static Color Card { get { return Pick(0xF5F5F7, 0x2C2C2E); } }
-        public static Color CardHover { get { return Pick(0xE8E8ED, 0x3A3A3C); } }
-        // Text uses opacity on dark (white at 92 / 64 %), flattened here because GDI text has no alpha.
-        public static Color Label { get { return Pick(0x1D1D1F, 0xEDEDED); } }
-        public static Color Label2 { get { return Pick(0x6E6E73, 0xAEAEAE); } }
-        // Blue means "you can act on this": links, the primary button, the selected menu item.
-        public static Color Link { get { return Pick(0x0066CC, 0x2997FF); } }
-        public static readonly Color PrimaryFill = Rgb(0x0071E3);
+        // Professional, minimal Windows palette
+        public static Color WindowBg { get { return Pick(0xFFFFFF, 0x121214); } }
+        public static Color SidebarBg { get { return Pick(0xF8F9FA, 0x18181B); } }
+        public static Color Card { get { return Pick(0xFFFFFF, 0x1E1E22); } }
+        public static Color CardHover { get { return Pick(0xF4F4F6, 0x27272C); } }
+        public static Color CardBorder { get { return Pick(0xE4E4E7, 0x2E2E34); } }
+        public static Color Border { get { return CardBorder; } }
+        public static Color FillHighlight { get { return Selection; } }
+
+        public static Color Label { get { return Pick(0x18181B, 0xF4F4F5); } }
+        public static Color Label2 { get { return Pick(0x71717A, 0xA1A1AA); } }
+        public static Color Label3 { get { return Pick(0xA1A1AA, 0x71717A); } }
+
+        public static Color Link { get { return Pick(0x0284C7, 0x38BDF8); } }
+        public static readonly Color PrimaryFill = Rgb(0x0284C7);
         public static readonly Color OnPrimary = Color.White;
-        public static Color Destructive { get { return Pick(0xD70015, 0xFF453A); } }
-        public static Color Fill { get { return dark ? Color.FromArgb(92, 120, 120, 128) : Color.FromArgb(51, 120, 120, 128); } }
-        public static Color Tinted { get { return dark ? Color.FromArgb(41, 10, 132, 255) : Color.FromArgb(20, 0, 122, 255); } }
-        public static Color Selection { get { return dark ? Color.FromArgb(20, 255, 255, 255) : Color.FromArgb(15, 0, 0, 0); } }
-        public static Color Separator { get { return dark ? Color.FromArgb(153, 84, 84, 88) : Color.FromArgb(74, 60, 60, 67); } }
-        public static Color Field { get { return Pick(0xFFFFFF, 0x2C2C2E); } }
-        public static Color FieldBorder { get { return Pick(0xD2D2D7, 0x48484A); } }
+        public static Color Destructive { get { return Pick(0xDC2626, 0xF87171); } }
+        public static Color Success { get { return Pick(0x16A34A, 0x4ADE80); } }
 
-        // Menus float, so they're near-opaque material with a hairline edge and a soft shadow.
-        public static Color MenuBg { get { return dark ? Color.FromArgb(250, 42, 42, 45) : Color.FromArgb(250, 246, 246, 248); } }
-        public static Color MenuEdge { get { return dark ? Color.FromArgb(40, 255, 255, 255) : Color.FromArgb(30, 0, 0, 0); } }
+        public static Color Fill { get { return dark ? Color.FromArgb(25, 255, 255, 255) : Color.FromArgb(12, 0, 0, 0); } }
+        public static Color Tinted { get { return dark ? Color.FromArgb(40, 2, 132, 199) : Color.FromArgb(20, 2, 132, 199); } }
+        public static Color Selection { get { return dark ? Color.FromArgb(30, 255, 255, 255) : Color.FromArgb(18, 0, 0, 0); } }
+        public static Color Separator { get { return dark ? Color.FromArgb(255, 46, 46, 52) : Color.FromArgb(255, 228, 228, 231); } }
+        public static Color Field { get { return Pick(0xFFFFFF, 0x1E1E22); } }
+        public static Color FieldBorder { get { return Pick(0xD4D4D8, 0x3F3F46); } }
 
-        // ---- shape (§6) ----
-        public const int RadiusCard = 18, RadiusField = 12, RadiusSmall = 8, RadiusItem = 6, RadiusMenu = 10;
+        public static Color MenuBg { get { return dark ? Color.FromArgb(252, 28, 28, 32) : Color.FromArgb(252, 255, 255, 255); } }
+        public static Color MenuEdge { get { return dark ? Color.FromArgb(50, 255, 255, 255) : Color.FromArgb(40, 0, 0, 0); } }
+
+        // Consistent modern radii
+        public const int RadiusCard = 12, RadiusField = 8, RadiusSmall = 6, RadiusItem = 6, RadiusMenu = 8;
 
         public static GraphicsPath RoundRect(RectangleF r, float radius)
         {
@@ -96,6 +97,13 @@ namespace DeskWidgets
                 g.FillPath(b, path);
         }
 
+        public static void DrawRoundBorder(Graphics g, Color c, RectangleF r, float radius, float stroke = 1f)
+        {
+            using (var path = RoundRect(r, radius))
+            using (var pen = new Pen(c, stroke))
+                g.DrawPath(pen, path);
+        }
+
         public static Color Blend(Color a, Color b, float t)
         {
             return Color.FromArgb(
@@ -105,9 +113,6 @@ namespace DeskWidgets
                 a.B + (int)((b.B - a.B) * t));
         }
 
-        // ---- type (§3) ----
-        // Sizes are px (Apple's numbers). Segoe UI Variable is the Windows face closest to SF Pro:
-        // Text under 20 px, Display from 20 up (§3.1). Windows 10 falls back to Segoe UI.
         static readonly Dictionary<string, Font> fonts = new Dictionary<string, Font>();
 
         public static Font Font(float px, int weight = 400)
@@ -128,18 +133,17 @@ namespace DeskWidgets
             return f;
         }
 
-        // The app text styles used across the app's own windows (§3.5, web-app sizes §2.9).
-        public static Font LargeTitle { get { return Font(34, 700); } }
-        public static Font Title3 { get { return Font(20, 600); } }
-        public static Font Headline { get { return Font(17, 600); } }
-        public static Font SectionTitle { get { return Font(17, 700); } }
-        public static Font Body { get { return Font(15); } }
-        public static Font BodyEmphasized { get { return Font(15, 600); } }
-        public static Font Footnote { get { return Font(13); } }
-        public static Font Caption { get { return Font(12); } }
-        public static Font CaptionEmphasized { get { return Font(12, 600); } }
-        public static Font Button { get { return Font(13, 600); } }
-        public static Font Menu { get { return Font(14); } }
+        public static Font LargeTitle { get { return Font(28, 700); } }
+        public static Font Title3 { get { return Font(18, 600); } }
+        public static Font Headline { get { return Font(16, 600); } }
+        public static Font SectionTitle { get { return Font(15, 700); } }
+        public static Font Body { get { return Font(14); } }
+        public static Font BodyEmphasized { get { return Font(14, 600); } }
+        public static Font Footnote { get { return Font(12); } }
+        public static Font Caption { get { return Font(11); } }
+        public static Font CaptionEmphasized { get { return Font(11, 600); } }
+        public static Font Button { get { return Font(12, 600); } }
+        public static Font Menu { get { return Font(13); } }
 
         static Font mono;
         public static Font Mono
@@ -148,17 +152,14 @@ namespace DeskWidgets
             {
                 if (mono == null)
                 {
-                    mono = new Font("Cascadia Mono", 9.75f);
-                    if (mono.Name != "Cascadia Mono") { mono.Dispose(); mono = new Font("Consolas", 9.75f); }
+                    mono = new Font("Cascadia Mono", 9.5f);
+                    if (mono.Name != "Cascadia Mono") { mono.Dispose(); mono = new Font("Consolas", 9.5f); }
                 }
                 return mono;
             }
         }
 
         static Font icons;
-
-        // Line icons in the SF Symbols spirit: Segoe Fluent Icons on Windows 11, Segoe MDL2 Assets on
-        // Windows 10 (same code points).
         public static Font Icons
         {
             get
@@ -172,7 +173,6 @@ namespace DeskWidgets
             }
         }
 
-        // Windows title bar and scrollbars stay native, following the same light/dark choice.
         public static void ApplyToWindow(IntPtr hwnd)
         {
             int d = dark ? 1 : 0;

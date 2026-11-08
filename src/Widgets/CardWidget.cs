@@ -20,16 +20,16 @@ namespace DeskWidgets.Widgets
 
         protected static readonly Palette DarkPalette = new Palette
         {
-            Bg = Rgb(0x1C1C1E), Fg = Color.White, Fg2 = Rgb(0x98989F), Fill = Rgb(0x2C2C2E), Sep = Rgb(0x38383A),
-            Red = Rgb(0xFF453A), Orange = Rgb(0xFF9F0A), Yellow = Rgb(0xFFD60A), Green = Rgb(0x30D158),
-            Blue = Rgb(0x0A84FF), Purple = Rgb(0xBF5AF2), OnAccent = Color.White
+            Bg = Rgb(0x18181B), Fg = Rgb(0xF4F4F5), Fg2 = Rgb(0xA1A1AA), Fill = Rgb(0x27272A), Sep = Rgb(0x3F3F46),
+            Red = Rgb(0xEF4444), Orange = Rgb(0xF97316), Yellow = Rgb(0xF59E0B), Green = Rgb(0x10B981),
+            Blue = Rgb(0x3B82F6), Purple = Rgb(0x8B5CF6), OnAccent = Color.White
         };
 
         protected static readonly Palette LightPalette = new Palette
         {
-            Bg = Color.White, Fg = Color.Black, Fg2 = Rgb(0x6E6E73), Fill = Rgb(0xF2F2F7), Sep = Rgb(0xE5E5EA),
-            Red = Rgb(0xFF3B30), Orange = Rgb(0xFF9500), Yellow = Rgb(0xFFCC00), Green = Rgb(0x34C759),
-            Blue = Rgb(0x007AFF), Purple = Rgb(0xAF52DE), OnAccent = Color.White
+            Bg = Color.White, Fg = Rgb(0x09090B), Fg2 = Rgb(0x71717A), Fill = Rgb(0xF4F4F5), Sep = Rgb(0xE4E4E7),
+            Red = Rgb(0xDC2626), Orange = Rgb(0xEA580C), Yellow = Rgb(0xD97706), Green = Rgb(0x059669),
+            Blue = Rgb(0x2563EB), Purple = Rgb(0x7C3AED), OnAccent = Color.White
         };
 
         // macOS "vibrant" desktop widgets: frosted wallpaper behind, everything in white.
@@ -102,7 +102,11 @@ namespace DeskWidgets.Widgets
             using (var card = CardPath())
             {
                 if (IsVibrant) DrawFrosted(g, card);
-                else using (var b = new SolidBrush(CardBackground(pal))) g.FillPath(b, card);
+                else
+                {
+                    using (var b = new SolidBrush(CardBackground(pal))) g.FillPath(b, card);
+                    using (var pen = new Pen(pal.Sep, 1f)) g.DrawPath(pen, card);
+                }
             }
             DrawContent(g, pal);
             g.ResetClip();
@@ -144,7 +148,7 @@ namespace DeskWidgets.Widgets
 
         protected GraphicsPath CardPath()
         {
-            return RoundRect(new RectangleF(0, 0, W, H), P(22));
+            return RoundRect(new RectangleF(0.5f, 0.5f, W - 1f, H - 1f), P(14));
         }
 
         // Runs slow work (network, disk, decoding) on a worker thread and hands the result, or the

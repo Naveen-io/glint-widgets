@@ -53,6 +53,7 @@ namespace DeskWidgets
 
         static void OnThreadException(object sender, ThreadExceptionEventArgs e)
         {
+            try { File.WriteAllText("crash.log", e.Exception.ToString()); } catch { }
             string plugin = Plugins.FromException(e.Exception);
             if (plugin != null) { Plugins.Crashed(plugin, e.Exception); return; }
             // Not a plugin: same choice WinForms offers without a handler.
@@ -62,6 +63,7 @@ namespace DeskWidgets
 
         static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
+            try { File.WriteAllText("crash.log", e.ExceptionObject != null ? e.ExceptionObject.ToString() : "null"); } catch { }
             var ex = e.ExceptionObject as Exception;
             string plugin = ex != null ? Plugins.FromException(ex) : null;
             if (plugin != null) Plugins.CrashedFatally(plugin, ex);
@@ -272,6 +274,27 @@ namespace DeskWidgets
             return widgets.Count(w => w.Settings.Type == typeId);
         }
 
+        public List<WidgetWindow> ActiveWidgets
+        {
+            get { return new List<WidgetWindow>(widgets); }
+        }
+
+        bool allHidden;
+        public bool AreAllWidgetsHidden { get { return allHidden; } }
+
+        public void ToggleWidgetsVisibility()
+        {
+            allHidden = !allHidden;
+            foreach (var w in widgets.ToArray())
+            {
+                if (allHidden)
+                    Native.ShowWindow(w.Handle, Native.SW_HIDE);
+                else
+                    Native.ShowWindow(w.Handle, Native.SW_SHOWNOACTIVATE);
+            }
+            RaiseWidgetsChanged();
+        }
+
         void RaiseWidgetsChanged()
         {
             if (WidgetsChanged != null) WidgetsChanged();
@@ -373,7 +396,12 @@ namespace DeskWidgets
 
         public void RemoveWidget(WidgetWindow w)
         {
-            if (!AlertDialog.Confirm("Remove Widget?", "This widget and its settings will be removed.", "Remove")) return;
+            RemoveWidget(w, true);
+        }
+
+        public void RemoveWidget(WidgetWindow w, bool prompt)
+        {
+            if (prompt && !AlertDialog.Confirm("Remove Widget?", "This widget and its settings will be removed.", "Remove")) return;
             widgets.Remove(w);
             config.Remove(w.Settings);
             w.AnimateRemove();
@@ -597,6 +625,7 @@ namespace DeskWidgets
                     CreateNoWindow = true,
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
+                    RedirectStandardError = true,
                     WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
                 };
                 using (var p = System.Diagnostics.Process.Start(psi))

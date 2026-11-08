@@ -225,8 +225,8 @@ namespace DeskWidgets
 
         void DrawLockFlash(Graphics g, Size sz)
         {
-            int alpha = (int)(50 * lockFlash);
-            using (var pen = new Pen(Color.FromArgb(alpha, Theme.PrimaryFill), Px(2)))
+            int alpha = (int)(220 * lockFlash);
+            using (var pen = new Pen(Color.FromArgb(alpha, Theme.PrimaryFill), Px(3)))
                 g.DrawRectangle(pen, 1, 1, sz.Width - 3, sz.Height - 3);
         }
 
@@ -247,7 +247,19 @@ namespace DeskWidgets
                 delegate { appearAnim = null; Close(); });
         }
 
-        void FlashLock()
+        public bool IsLocked
+        {
+            get { return Locked; }
+            set { Settings.Set("locked", value); FlashLock(); }
+        }
+
+        public int WidgetOpacity
+        {
+            get { return OpacityPercent; }
+            set { Settings.Set("opacity", value); Render(); }
+        }
+
+        public void FlashLock()
         {
             if (lockFlashAnim != null) lockFlashAnim.Cancel();
             lockFlash = 1f;
