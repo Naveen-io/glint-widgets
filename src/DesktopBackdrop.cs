@@ -11,12 +11,11 @@ using Microsoft.Win32;
 
 namespace DeskWidgets
 {
-    // The Liquid Glass backdrop: widgets sample the desktop wallpaper behind them, blurred.
-    // Kept as an optimized 1/4-scale copy of the desktop wallpaper for silky smooth refraction
-    // with zero banding and zero tiling artifacts. Rebuilt only when the wallpaper or displays change.
+    // The Liquid Glass backdrop: widgets sample the desktop wallpaper behind them at 1:1 native resolution.
+    // Preserves razor-sharp quality, vibrant contrast, and applies a silky-smooth soft optical blur.
     static class DesktopBackdrop
     {
-        const int Shrink = 4;
+        const int Shrink = 1;
         static Bitmap map;
         static Rectangle virt;
         static bool built;
@@ -34,8 +33,7 @@ namespace DeskWidgets
             built = false;
         }
 
-        // A blurred copy of the wallpaper behind screenRect, at the given size. Caller disposes it.
-        // An empty rect (library previews) gets a neutral stand-in.
+        // A pristine blurred copy of the wallpaper behind screenRect, at the given size. Caller disposes it.
         public static Bitmap Blurred(Size size, Rectangle screenRect)
         {
             var bmp = new Bitmap(Math.Max(1, size.Width), Math.Max(1, size.Height), PixelFormat.Format32bppPArgb);
@@ -65,10 +63,10 @@ namespace DeskWidgets
                     return bmp;
                 }
 
-                float sx = (screenRect.X - virt.X) / (float)Shrink;
-                float sy = (screenRect.Y - virt.Y) / (float)Shrink;
-                float sw = screenRect.Width / (float)Shrink;
-                float sh = screenRect.Height / (float)Shrink;
+                float sx = screenRect.X - virt.X;
+                float sy = screenRect.Y - virt.Y;
+                float sw = screenRect.Width;
+                float sh = screenRect.Height;
 
                 // Clamp strictly to map bounds so no out-of-bounds artifact or edge wrap can occur
                 float srcX = Math.Max(0, Math.Min(map.Width - 1, sx));
@@ -84,7 +82,89 @@ namespace DeskWidgets
                     g.DrawImage(map, new Rectangle(0, 0, bmp.Width, bmp.Height), srcX, srcY, srcW, srcH, GraphicsUnit.Pixel, attrs);
                 }
             }
+
+            // Apply soft optical refraction blur
+            SoftBlur(bmp, 2);
+
             return bmp;
+        }
+
+        // Fast separable 2-pass soft blur operating directly on 32bpp PARGB bytes in memory
+        static void SoftBlur(Bitmap bmp, int radius)
+        {
+            if (radius <= 0) return;
+            int w = bmp.Width, h = bmp.Height;
+            if (w < 2 || h < 2) return;
+            var rect = new Rectangle(0, 0, w, h);
+            var data = bmp.LockBits(rect, ImageLockMode.ReadWrite, PixelFormat.Format32bppPArgb);
+            try
+            {
+                int stride = data.Stride;
+                byte[] src = new byte[stride * h];
+                byte[] dst = new byte[stride * h];
+                Marshal.Copy(data.Scan0, src, 0, src.Length);
+
+                // Horizontal pass
+                for (int y = 0; y < h; y++)
+                {
+                    int row = y * stride;
+                    for (int x = 0; x < w; x++)
+                    {
+                        int r = 0, g = 0, b = 0, a = 0, count = 0;
+                        for (int k = -radius; k <= radius; k++)
+                        {
+                            int px = x + k;
+                            if (px < 0) px = 0;
+                            else if (px >= w) px = w - 1;
+                            int idx = row + px * 4;
+                            b += src[idx];
+                            g += src[idx + 1];
+                            r += src[idx + 2];
+                            a += src[idx + 3];
+                            count++;
+                        }
+                        int outIdx = row + x * 4;
+                        dst[outIdx] = (byte)(b / count);
+                        dst[outIdx + 1] = (byte)(g / count);
+                        dst[outIdx + 2] = (byte)(r / count);
+                        dst[outIdx + 3] = (byte)(a / count);
+                    }
+                }
+
+                // Vertical pass
+                for (int x = 0; x < w; x++)
+                {
+                    int col = x * 4;
+                    for (int y = 0; y < h; y++)
+                    {
+                        int r = 0, g = 0, b = 0, a = 0, count = 0;
+                        for (int k = -radius; k <= radius; k++)
+                        {
+                            int py = y + k;
+                            if (py < 0) py = 0;
+                            else if (py >= h) py = h - 1;
+                            int idx = py * stride + col;
+                            b += dst[idx];
+                            g += dst[idx + 1];
+                            r += dst[idx + 2];
+                            a += dst[idx + 3];
+                            count++;
+                        }
+                        int outIdx = y * stride + col;
+                        src[outIdx] = (byte)(b / count);
+                        src[outIdx + 1] = (byte)(g / count);
+                        src[outIdx + 2] = (byte)(r / count);
+                        src[outIdx + 3] = (byte)(a / count);
+                    }
+                }
+
+                Marshal.Copy(src, 0, data.Scan0, src.Length);
+            }
+            catch { }
+            finally
+            {
+                bmp.UnlockBits(data);
+            }
         }
 
         // Build on a ThreadPool thread. done(newMap, newVirt) fires on the pool thread;
@@ -113,8 +193,8 @@ namespace DeskWidgets
 
         static Bitmap BuildCore(Rectangle virtRect, Screen[] screens)
         {
-            int bw = Math.Max(1, virtRect.Width / Shrink);
-            int bh = Math.Max(1, virtRect.Height / Shrink);
+            int bw = Math.Max(1, virtRect.Width);
+            int bh = Math.Max(1, virtRect.Height);
             var bmp = new Bitmap(bw, bh, PixelFormat.Format32bppPArgb);
             bmp.SetResolution(96, 96);
             using (var g = Graphics.FromImage(bmp))
@@ -184,8 +264,8 @@ namespace DeskWidgets
             float w = style == 2 ? screen.Width : img.Width * scale, h = style == 2 ? screen.Height : img.Height * scale;
             float x = screen.X + (screen.Width - w) / 2 - virtRect.X, y = screen.Y + (screen.Height - h) / 2 - virtRect.Y;
             var state = g.Save();
-            g.SetClip(new RectangleF((screen.X - virtRect.X) / (float)Shrink, (screen.Y - virtRect.Y) / (float)Shrink, screen.Width / (float)Shrink, screen.Height / (float)Shrink));
-            g.DrawImage(img, new RectangleF(x / Shrink, y / Shrink, w / Shrink, h / Shrink),
+            g.SetClip(new Rectangle(screen.X - virtRect.X, screen.Y - virtRect.Y, screen.Width, screen.Height));
+            g.DrawImage(img, new RectangleF(x, y, w, h),
                              new RectangleF(0, 0, img.Width, img.Height), GraphicsUnit.Pixel);
             g.Restore(state);
         }

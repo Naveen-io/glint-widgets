@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background squircle gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="50%" stop-color="#090d16"/>
+      <stop offset="100%" stop-color="#030712"/>
+    </linearGradient>
+
+    <!-- Glass ambient glow -->
+    <radialGradient id="cyanAmbient" cx="25%" cy="25%" r="75%">
+      <stop offset="0%" stop-color="#00f2fe" stop-opacity="0.35"/>
+      <stop offset="50%" stop-color="#4facfe" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="purpleAmbient" cx="75%" cy="75%" r="70%">
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.3"/>
+      <stop offset="50%" stop-color="#6366f1" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Outer Squircle Rim Gradient -->
+    <linearGradient id="rimGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="35%" stop-color="#38bdf8" stop-opacity="0.4"/>
+      <stop offset="70%" stop-color="#818cf8" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.1"/>
+    </linearGradient>
+
+    <!-- Primary glass widget card gradients -->
+    <linearGradient id="glassFill1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.04"/>
+    </linearGradient>
+
+    <linearGradient id="glassBorder1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.75"/>
+      <stop offset="40%" stop-color="#38bdf8" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.15"/>
+    </linearGradient>
+
+    <!-- Accent Widget Gradient (Cyan to Blue) -->
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00f2fe"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+
+    <!-- Accent Widget 2 Gradient (Violet to Indigo) -->
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+
+    <!-- Specular Sheen Gradient -->
+    <linearGradient id="sheen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45"/>
+      <stop offset="40%" stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Drop Shadows -->
+    <filter id="shadowFilter" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+
+    <filter id="glowCyan" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="0" stdDeviation="10" flood-color="#38bdf8" flood-opacity="0.6"/>
+    </filter>
+
+    <clipPath id="squircleClip">
+      <rect x="24" y="24" width="464" height="464" rx="116" ry="116"/>
+    </clipPath>
+  </defs>
+
+  <!-- Base App Icon Squircle with Shadow -->
+  <rect x="24" y="24" width="464" height="464" rx="116" ry="116" fill="url(#bgGrad)" filter="url(#shadowFilter)"/>
+
+  <!-- Inside Clipped Area -->
+  <g clip-path="url(#squircleClip)">
+    <!-- Ambient Internal Glows -->
+    <rect x="24" y="24" width="464" height="464" fill="url(#cyanAmbient)"/>
+    <rect x="24" y="24" width="464" height="464" fill="url(#purpleAmbient)"/>
+
+    <!-- Subtle Diagonal Desktop Light Beam -->
+    <path d="M-50,120 L250,-50 L560,300 L260,560 Z" fill="#ffffff" fill-opacity="0.02"/>
+
+    <!-- ==================== WIDGET 1: Top-Left Hero Glass Tile ==================== -->
+    <g filter="url(#cardShadow)">
+      <!-- Main Tile Body -->
+      <rect x="76" y="76" width="164" height="164" rx="38" ry="38" fill="url(#glassFill1)"/>
+      <rect x="76" y="76" width="164" height="164" rx="38" ry="38" fill="none" stroke="url(#glassBorder1)" stroke-width="2.5"/>
+      <!-- Internal Top Sheen -->
+      <path d="M78,114 C78,94 94,78 114,78 L202,78 C222,78 238,94 238,114 L238,140 L78,140 Z" fill="url(#sheen)"/>
+      
+      <!-- Cyan Glow Pill inside Hero Tile -->
+      <rect x="104" y="104" width="44" height="44" rx="14" ry="14" fill="url(#accentGrad)" filter="url(#glowCyan)"/>
+      <!-- Inner Spark/App Glyph -->
+      <path d="M126,114 L128.5,123.5 L138,126 L128.5,128.5 L126,138 L123.5,128.5 L114,126 L123.5,123.5 Z" fill="#ffffff"/>
+      
+      <!-- Progress Bar / Glass Level Track -->
+      <rect x="104" y="174" width="108" height="8" rx="4" ry="4" fill="#ffffff" fill-opacity="0.12"/>
+      <rect x="104" y="174" width="76" height="8" rx="4" ry="4" fill="url(#accentGrad)"/>
+      
+      <circle cx="194" cy="126" r="5" fill="#38bdf8"/>
+      <circle cx="176" cy="126" r="4" fill="#ffffff" fill-opacity="0.4"/>
+    </g>
+
+    <!-- ==================== WIDGET 2: Top-Right Wide Glass Pill ==================== -->
+    <g filter="url(#cardShadow)">
+      <rect x="264" y="76" width="172" height="96" rx="32" ry="32" fill="url(#glassFill1)"/>
+      <rect x="264" y="76" width="172" height="96" rx="32" ry="32" fill="none" stroke="url(#glassBorder1)" stroke-width="2"/>
+      <!-- Stat rows -->
+      <rect x="288" y="104" width="42" height="10" rx="5" ry="5" fill="#ffffff" fill-opacity="0.6"/>
+      <rect x="288" y="126" width="72" height="14" rx="7" ry="7" fill="url(#purpleGrad)"/>
+      <circle cx="400" cy="124" r="14" fill="#ffffff" fill-opacity="0.08"/>
+      <path d="M394,124 L406,124 M400,118 L400,130" stroke="#c084fc" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+
+    <!-- ==================== WIDGET 3: Bottom-Left Card with Data Stream ==================== -->
+    <g filter="url(#cardShadow)">
+      <rect x="76" y="264" width="164" height="172" rx="38" ry="38" fill="url(#glassFill1)"/>
+      <rect x="76" y="264" width="164" height="172" rx="38" ry="38" fill="none" stroke="url(#glassBorder1)" stroke-width="2"/>
+      <!-- Audio / Spectrum Waves -->
+      <rect x="104" y="360" width="10" height="36" rx="5" ry="5" fill="#38bdf8"/>
+      <rect x="122" y="340" width="10" height="56" rx="5" ry="5" fill="#00f2fe"/>
+      <rect x="140" y="324" width="10" height="72" rx="5" ry="5" fill="#818cf8"/>
+      <rect x="158" y="348" width="10" height="48" rx="5" ry="5" fill="#c084fc"/>
+      <rect x="176" y="368" width="10" height="28" rx="5" ry="5" fill="#e879f9"/>
+      
+      <!-- Mini Pill -->
+      <rect x="104" y="294" width="80" height="12" rx="6" ry="6" fill="#ffffff" fill-opacity="0.25"/>
+    </g>
+
+    <!-- ==================== WIDGET 4: Bottom-Right Large Accent Card ==================== -->
+    <g filter="url(#cardShadow)">
+      <rect x="264" y="196" width="172" height="240" rx="42" ry="42" fill="url(#glassFill1)"/>
+      <rect x="264" y="196" width="172" height="240" rx="42" ry="42" fill="none" stroke="url(#glassBorder1)" stroke-width="2.5"/>
+      <path d="M266,238 C266,215 285,198 308,198 L392,198 C415,198 434,215 434,238 L434,260 L266,260 Z" fill="url(#sheen)"/>
+      
+      <!-- Central Glowing Glass Orb / Focus Ring -->
+      <circle cx="350" cy="300" r="46" fill="#1e1b4b" fill-opacity="0.6"/>
+      <circle cx="350" cy="300" r="46" fill="none" stroke="url(#purpleGrad)" stroke-width="4"/>
+      <circle cx="350" cy="300" r="32" fill="url(#purpleGrad)" fill-opacity="0.35"/>
+      <circle cx="350" cy="300" r="16" fill="#ffffff"/>
+
+      <!-- Toggle / Switch Indicator below -->
+      <rect x="306" y="380" width="88" height="24" rx="12" ry="12" fill="#ffffff" fill-opacity="0.1"/>
+      <rect x="306" y="380" width="52" height="24" rx="12" ry="12" fill="url(#accentGrad)"/>
+      <circle cx="330" cy="392" r="8" fill="#ffffff"/>
+    </g>
+
+    <!-- Top Gloss Highlight along the full perimeter -->
+    <rect x="24" y="24" width="464" height="464" rx="116" ry="116" fill="none" stroke="url(#rimGrad)" stroke-width="3"/>
+  </g>
+</svg>

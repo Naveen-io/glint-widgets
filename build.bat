@@ -1,9 +1,8 @@
 @echo off
-rem Builds bin\DeskWidgets.exe with the C# compiler that ships with Windows (.NET Framework 4).
-rem The Windows media session (Now playing) comes from the WinRT metadata in System32\WinMetadata,
-rem which every Windows 10/11 PC has.
+rem Builds bin\DeskWidgets.exe and bin\GlintWidgets.exe with the C# compiler that ships with Windows (.NET Framework 4).
 cd /d "%~dp0"
-rem No character that makes code read differently from how it compiles (tools\check-hidden.ps1).
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Stop-Process -Name DeskWidgets -Force -ErrorAction SilentlyContinue; Stop-Process -Name GlintWidgets -Force -ErrorAction SilentlyContinue; exit 0"
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\check-hidden.ps1
 if errorlevel 1 exit /b 1
 if not exist bin mkdir bin
@@ -18,4 +17,5 @@ set WINMD=%WINDIR%\System32\WinMetadata
   /r:"%WINMD%\Windows.ApplicationModel.winmd" ^
   /recurse:src\*.cs
 if errorlevel 1 exit /b 1
-echo Built bin\DeskWidgets.exe - run it once and "Desk Widgets" appears in the Start menu.
+copy /y bin\DeskWidgets.exe bin\GlintWidgets.exe >nul
+echo Built bin\DeskWidgets.exe and bin\GlintWidgets.exe - Glint Widgets is ready.

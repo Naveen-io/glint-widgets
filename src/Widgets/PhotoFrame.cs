@@ -9,14 +9,14 @@ using System.Windows.Forms;
 using DeskWidgets;
 using DeskWidgets.Widgets;
 
-// Medium: one picture from a folder, changed on a schedule or with the next button (shown on
-// hover). Just the picture: no file name or details. Stills are decoded on a background thread
-// and kept only as a widget-sized bitmap; animated GIFs keep the compressed file in memory and
+// Medium: one picture from a single file or a folder, changed on a schedule or with the next button (shown on
+// hover). Encapsulated inside the curved Liquid Glass material with specular highlights. Stills are decoded on
+// a background thread and kept only as a widget-sized bitmap; animated GIFs keep the compressed file in memory and
 // decode one frame at a time, at the GIF's own frame rate.
-[DeskWidget(Name = "Photo Frame", Description = "A picture from your folder, changes hourly")]
+[DeskWidget(Name = "Photo Frame", Description = "A photo or folder of pictures encapsulated in liquid glass")]
 public sealed class PhotoFrame : CardWidget
 {
-    static readonly string[] Extensions = { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tif", ".tiff" };
+    static readonly string[] Extensions = { ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".webp", ".tif", ".tiff" };
     static readonly int[] Intervals = { 15, 60, 360, 1440 };
     static readonly string[] IntervalNames = { "Every 15 Minutes", "Every Hour", "Every 6 Hours", "Once a Day" };
     const int MaxGifBytes = 40 * 1024 * 1024; // bigger GIFs show their first frame only
@@ -45,7 +45,13 @@ public sealed class PhotoFrame : CardWidget
 
     public PhotoFrame(Section settings) : base(settings, true)
     {
+        AllowDrop = true;
         shuffle.Tick += delegate { Next(); };
+    }
+
+    string SingleImage
+    {
+        get { return Settings.Get("image", ""); }
     }
 
     string Folder
@@ -65,7 +71,14 @@ public sealed class PhotoFrame : CardWidget
     {
         shuffle.Interval = Settings.GetInt("every", 60) * 60 * 1000;
         shuffle.Start();
-        Next();
+        if (!string.IsNullOrEmpty(SingleImage) && File.Exists(SingleImage))
+        {
+            ShowPicture(SingleImage, -1);
+        }
+        else
+        {
+            Next();
+        }
     }
 
     protected override void Changed()
@@ -80,6 +93,15 @@ public sealed class PhotoFrame : CardWidget
     void Next()
     {
         if (loading) return;
+
+        // If user pinned a single image, reload or re-show that image
+        string single = SingleImage;
+        if (!string.IsNullOrEmpty(single) && File.Exists(single))
+        {
+            ShowPicture(single, -1);
+            return;
+        }
+
         loading = true;
         string folder = Folder;
         bool deep = Subfolders;
@@ -232,7 +254,7 @@ public sealed class PhotoFrame : CardWidget
     {
         if (IsButton(p)) Next();
         else if (photoPath != null) OpenPicture();
-        else ChooseFolder();
+        else ChooseImage();
     }
 
     void OpenPicture()
@@ -240,25 +262,78 @@ public sealed class PhotoFrame : CardWidget
         try { Process.Start(photoPath); } catch (Exception) { }
     }
 
+    void ChooseImage()
+    {
+        using (var dlg = new OpenFileDialog
+        {
+            Title = "Choose Picture File",
+            Filter = "Image Files (*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif;*.tif)|*.jpg;*.jpeg;*.png;*.webp;*.bmp;*.gif;*.tif|All Files (*.*)|*.*",
+            RestoreDirectory = true
+        })
+        {
+            if (dlg.ShowDialog() != DialogResult.OK) return;
+            Settings.Set("image", dlg.FileName);
+            ShowPicture(dlg.FileName, -1);
+        }
+    }
+
     void ChooseFolder()
     {
         using (var dlg = new FolderBrowserDialog { Description = "Choose the folder of pictures to show", SelectedPath = Folder })
         {
             if (dlg.ShowDialog() != DialogResult.OK) return;
+            Settings.Remove("image");
             Settings.Set("folder", dlg.SelectedPath);
             index = -1;
             Next();
         }
     }
 
+    protected override void OnDragEnter(DragEventArgs drgevent)
+    {
+        base.OnDragEnter(drgevent);
+        if (drgevent.Data.GetDataPresent(DataFormats.FileDrop))
+            drgevent.Effect = DragDropEffects.Copy;
+    }
+
+    protected override void OnDragDrop(DragEventArgs drgevent)
+    {
+        base.OnDragDrop(drgevent);
+        if (!drgevent.Data.GetDataPresent(DataFormats.FileDrop)) return;
+        string[] files = drgevent.Data.GetData(DataFormats.FileDrop) as string[];
+        if (files == null || files.Length == 0) return;
+        string first = files[0];
+        if (Directory.Exists(first))
+        {
+            Settings.Remove("image");
+            Settings.Set("folder", first);
+            index = -1;
+            Next();
+        }
+        else if (File.Exists(first) && Extensions.Contains(Path.GetExtension(first).ToLowerInvariant()))
+        {
+            Settings.Set("image", first);
+            ShowPicture(first, -1);
+        }
+    }
+
     protected override void BuildWidgetMenu(PopupMenu menu)
     {
         menu.Add("Next Picture", Next);
-        if (photoPath != null) menu.Add("Open Picture", OpenPicture);
-        menu.Add("Choose Folder…", ChooseFolder);
+        if (photoPath != null) menu.Add("Open Picture in Viewer", OpenPicture);
+        menu.Add("Choose Picture File…", ChooseImage);
+        menu.Add("Choose Pictures Folder…", ChooseFolder);
+        if (!string.IsNullOrEmpty(SingleImage))
+        {
+            menu.Add("Clear Pinned Picture (Use Folder)", delegate
+            {
+                Settings.Remove("image");
+                Next();
+            });
+        }
         menu.AddCheck("Include Subfolders", Subfolders, delegate { Settings.Set("subfolders", !Subfolders); index = -1; Next(); });
         menu.AddCheck("Play Animated GIFs", Animate, delegate { Settings.Set("animate", !Animate); nextFrameDue = Environment.TickCount; Render(); });
-        var every = menu.AddSubmenu("Change Picture");
+        var every = menu.AddSubmenu("Change Picture Interval");
         int cur = Settings.GetInt("every", 60);
         for (int i = 0; i < Intervals.Length; i++)
         {
@@ -274,7 +349,7 @@ public sealed class PhotoFrame : CardWidget
     }
 
     // ---------- drawing ----------
-    protected override Color CardBackground(Palette pal) { return HasPicture || !IsHandleCreated ? Color.Black : pal.Bg; }
+    protected override Color CardBackground(Palette pal) { return pal.Bg; }
 
     protected override void DrawContent(Graphics g, Palette pal)
     {
@@ -282,8 +357,8 @@ public sealed class PhotoFrame : CardWidget
         if (!HasPicture)
         {
             if (!IsHandleCreated) { DrawPreviewScene(g); return; }
-            Label(g, loading ? "Loading pictures…" : "No pictures here yet", F(15, "semibold"), pal.Fg, W / 2, H / 2 - P(22), W - m * 2, StringAlignment.Center);
-            Label(g, loading ? Folder : "Click to choose a folder", F(11, "regular"), pal.Fg2, W / 2, H / 2 + P(2), W - m * 2, StringAlignment.Center);
+            Label(g, loading ? "Loading picture…" : "No picture chosen", F(15, "semibold"), pal.Fg, W / 2, H / 2 - P(22), W - m * 2, StringAlignment.Center);
+            Label(g, loading ? (SingleImage.Length > 0 ? SingleImage : Folder) : "Click to choose a picture or drop file here", F(11, "regular"), pal.Fg2, W / 2, H / 2 + P(2), W - m * 2, StringAlignment.Center);
             return;
         }
 
@@ -301,6 +376,9 @@ public sealed class PhotoFrame : CardWidget
             }
             else DrawPicture(g, still, dest, new RectangleF(0, 0, still.Width, still.Height));
             g.Restore(state);
+
+            // Encapsulate the picture underneath the curved liquid glass sheen and specular highlights
+            DrawLiquidGlassOver(g, card);
         }
 
         if (hovering)
@@ -358,6 +436,9 @@ public sealed class PhotoFrame : CardWidget
             }
             using (var sea = new SolidBrush(Rgb(0x1F2440))) g.FillRectangle(sea, 0, H * 0.72f, W, H * 0.28f);
             g.ResetClip();
+
+            // Liquid glass sheen over preview
+            DrawLiquidGlassOver(g, card);
         }
     }
 

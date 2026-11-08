@@ -73,9 +73,9 @@ namespace DeskWidgets
     // Owns the tray icon, the config file and all widget windows (one process for all widgets).
     sealed class App : ApplicationContext
     {
-        const string AppName = "Desk Widgets";
+        const string AppName = "Glint Widgets";
         const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-        const string RunName = "DeskWidgets";
+        const string RunName = "GlintWidgets";
 
         // True when the app was installed from an MSIX package. Autostart, URL protocol
         // and Start menu entry are all declared in the manifest instead of registry/shortcuts.

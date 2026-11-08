@@ -140,9 +140,10 @@ namespace DeskWidgets.Widgets
             // Follows @zakisheriff/liquid-glass --lg-panel-fill:
             // In dark mode: rgb(30 30 33 / 0.62) (frosted) or rgb(30 30 33 / 0.22) (clear)
             // In light mode: rgb(255 255 255 / 0.62)
+            // Default 75% opacity: 255 * 0.75 = 191.25 -> 192 alpha
             Color glassFill = IsDark
-                ? (IsClear ? Color.FromArgb(56, 30, 30, 33) : Color.FromArgb(158, 30, 30, 33))
-                : (IsClear ? Color.FromArgb(60, 255, 255, 255) : Color.FromArgb(158, 255, 255, 255));
+                ? (IsClear ? Color.FromArgb(64, 30, 30, 33) : Color.FromArgb(192, 30, 30, 33))
+                : (IsClear ? Color.FromArgb(64, 255, 255, 255) : Color.FromArgb(192, 255, 255, 255));
             using (var b = new SolidBrush(glassFill)) g.FillPath(b, card);
 
             // 3. Subtle incident light reflection (No harsh horizontal bands)
@@ -169,6 +170,40 @@ namespace DeskWidgets.Widgets
             // Soft specular reflection along the upper rim
             float r = P(14);
             using (var rimPen = new Pen(IsDark ? Color.FromArgb(45, 255, 255, 255) : Color.FromArgb(90, 255, 255, 255), 1f))
+            {
+                using (var topRim = new GraphicsPath())
+                {
+                    topRim.AddArc(0.5f, 0.5f, r * 2, r * 2, 180, 90);
+                    topRim.AddLine(r, 0.5f, W - r, 0.5f);
+                    topRim.AddArc(W - r * 2 - 0.5f, 0.5f, r * 2, r * 2, 270, 90);
+                    g.DrawPath(rimPen, topRim);
+                }
+            }
+        }
+
+        public void DrawLiquidGlassOver(Graphics g, GraphicsPath card)
+        {
+            var state = g.Save();
+            g.SetClip(card);
+
+            // 1. Soft surface sheen (gives liquid glass depth over content)
+            using (var sheen = new LinearGradientBrush(new PointF(0, 0), new PointF(0, H * 0.45f),
+                Color.FromArgb(28, 255, 255, 255), Color.FromArgb(0, 255, 255, 255)))
+            {
+                g.FillPath(sheen, card);
+            }
+
+            g.Restore(state);
+
+            // 2. Hairline perimeter edge
+            using (var edgePen = new Pen(IsDark ? Color.FromArgb(30, 255, 255, 255) : Color.FromArgb(20, 0, 0, 0), 1f))
+            {
+                g.DrawPath(edgePen, card);
+            }
+
+            // 3. Snell\'s law specular rim highlight along upper edge
+            float r = P(14);
+            using (var rimPen = new Pen(IsDark ? Color.FromArgb(60, 255, 255, 255) : Color.FromArgb(100, 255, 255, 255), 1.2f))
             {
                 using (var topRim = new GraphicsPath())
                 {

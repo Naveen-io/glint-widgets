@@ -64,7 +64,7 @@ namespace DeskWidgets
 
         public LibraryWindow()
         {
-            Text = "Desk Widgets";
+            Text = "Glint Widgets";
             Icon = App.AppIcon;
             BackColor = Theme.WindowBg;
             ForeColor = Theme.Label;
@@ -126,7 +126,7 @@ namespace DeskWidgets
 
             var brandTitle = new Label
             {
-                Text = "Desk Widgets",
+                Text = "Glint Widgets",
                 Font = Theme.Title3,
                 ForeColor = Theme.Label,
                 AutoSize = true,
@@ -341,7 +341,7 @@ namespace DeskWidgets
                 themeItems[i] = item;
             }
 
-            uninstallBtn = new PillButton("Uninstall Desk Widgets", ButtonStyle.Destructive);
+            uninstallBtn = new PillButton("Uninstall Glint Widgets", ButtonStyle.Destructive);
             uninstallBtn.Click += delegate { App.Current.UninstallApp(); };
             content.Controls.Add(uninstallBtn);
         }

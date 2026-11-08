@@ -67,7 +67,7 @@ namespace DeskWidgets
             if (Settings.GetInt("custom_w", 0) > 0)
                 menu.Add("Reset Size", delegate { Settings.Remove("custom_w"); Settings.Remove("custom_h"); Render(); });
             menu.AddSeparator();
-            menu.Add("Open Desk Widgets", App.Current.OpenLibrary);
+            menu.Add("Open Glint Widgets", App.Current.OpenLibrary);
             menu.AddSeparator();
             menu.AddDestructive("Remove Widget", delegate { App.Current.RemoveWidget(this); });
             menu.Show(Cursor.Position);
