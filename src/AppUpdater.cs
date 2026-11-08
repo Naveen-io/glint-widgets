@@ -10,11 +10,11 @@ namespace DeskWidgets
 {
     static class AppUpdater
     {
-        internal const string AppVersion = "1.8.4";
-        const string RepoOwner = "whoissaaif";
-        const string RepoName = "desk-widgets";
+        internal const string AppVersion = "2.0.0";
+        const string RepoOwner = "Naveen-io";
+        const string RepoName = "glint-widgets";
         const string ApiUrl = "https://api.github.com/repos/" + RepoOwner + "/" + RepoName + "/releases/latest";
-        const string ExeName = "DeskWidgets.exe";
+        const string ExeName = "GlintWidgets.exe";
 
         static string foundVersion, foundNotes, foundUrl;
 
