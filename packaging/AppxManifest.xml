@@ -11,7 +11,7 @@
             ProcessorArchitecture="x64" />
 
   <Properties>
-    <DisplayName>Desk Widgets</DisplayName>
+    <DisplayName>DeskWidgets</DisplayName>   <!-- must match the reserved name in Partner Center; "Desk Widgets" was taken -->
     <PublisherDisplayName>Saiff</PublisherDisplayName>
     <Description>Lightweight desktop widgets for Windows</Description>
     <Logo>assets\StoreLogo.png</Logo>
