@@ -102,7 +102,7 @@ if ($LASTEXITCODE -ne 0) {
 $certDir  = Join-Path $root "packaging\cert"
 $pfxPath  = Join-Path $certDir "DeskWidgets-dev.pfx"
 $password = "DeskWidgets"
-$subject  = "CN=DeskWidgets"
+$subject  = "CN=EC8DAD99-48BE-4472-BCFD-69FB32F35F9C"   # must match Identity/Publisher in AppxManifest.xml
 
 if (-not (Test-Path $pfxPath)) {
     Write-Host "Creating self-signed dev certificate..."
