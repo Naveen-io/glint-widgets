@@ -74,7 +74,7 @@ app small and lets widgets update independently.
 | Media | Photo Frame | Medium | Just the picture (no file name); animated GIFs play; changes hourly or on hover › next |
 | Media | Now Playing | Medium | Whatever Windows is playing (Spotify, browsers, Media Player): art, progress, play/pause/skip |
 | Developer | GitHub | Medium | Profile, streak, 30 weeks of contributions; refreshes every 30 min |
-| Sports | Race Hub | Medium | Next race, schedule, standings from the Jolpica F1 API |
+| Sports | F1 Hub | Medium | Next race, schedule, standings from the Jolpica F1 API |
 | Sports | F1 Live Timing | Large | Session timing, gaps, track map from OpenF1 |
 
 Users upgrading from an older version that had these as built-in are prompted to download them from
