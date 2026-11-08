@@ -11,13 +11,12 @@ using Microsoft.Win32;
 
 namespace DeskWidgets
 {
-    // The "vibrant" look: widgets show the wallpaper behind them, blurred. Layered windows can't use
-    // DWM's live blur, so we keep one tiny copy of the whole desktop wallpaper (1/12 scale, a few KB)
-    // and stretch the piece behind each widget back up, which blurs it for free. Rebuilt only when
-    // the wallpaper or the displays change.
+    // The Liquid Glass backdrop: widgets sample the desktop wallpaper behind them, blurred.
+    // Kept as an optimized 1/4-scale copy of the desktop wallpaper for silky smooth refraction
+    // with zero banding and zero tiling artifacts. Rebuilt only when the wallpaper or displays change.
     static class DesktopBackdrop
     {
-        const int Shrink = 12;
+        const int Shrink = 4;
         static Bitmap map;
         static Rectangle virt;
         static bool built;
@@ -46,22 +45,43 @@ namespace DeskWidgets
                 if (!screenRect.IsEmpty && !built && !building)
                 {
                     building = true;
-                    RebuildAsync(delegate(Bitmap b, Rectangle r) { App.RunOnUi(delegate { Apply(b, r); building = false; if (BackdropChanged != null) BackdropChanged(); }); });
+                    RebuildAsync(delegate(Bitmap b, Rectangle r)
+                    {
+                        App.RunOnUi(delegate
+                        {
+                            Apply(b, r);
+                            building = false;
+                            if (BackdropChanged != null) BackdropChanged();
+                        });
+                    });
                 }
                 if (screenRect.IsEmpty || map == null)
                 {
-                    using (var b = new LinearGradientBrush(new Point(0, 0), new Point(bmp.Width, bmp.Height), Color.FromArgb(70, 108, 120), Color.FromArgb(150, 120, 90)))
+                    using (var b = new LinearGradientBrush(new Point(0, 0), new Point(bmp.Width, bmp.Height),
+                        Color.FromArgb(35, 40, 50), Color.FromArgb(20, 22, 28)))
+                    {
                         g.FillRectangle(b, 0, 0, bmp.Width, bmp.Height);
+                    }
                     return bmp;
                 }
-                var src = new RectangleF((screenRect.X - virt.X) / (float)Shrink, (screenRect.Y - virt.Y) / (float)Shrink,
-                                         screenRect.Width / (float)Shrink, screenRect.Height / (float)Shrink);
+
+                float sx = (screenRect.X - virt.X) / (float)Shrink;
+                float sy = (screenRect.Y - virt.Y) / (float)Shrink;
+                float sw = screenRect.Width / (float)Shrink;
+                float sh = screenRect.Height / (float)Shrink;
+
+                // Clamp strictly to map bounds so no out-of-bounds artifact or edge wrap can occur
+                float srcX = Math.Max(0, Math.Min(map.Width - 1, sx));
+                float srcY = Math.Max(0, Math.Min(map.Height - 1, sy));
+                float srcW = Math.Max(1, Math.Min(map.Width - srcX, sw));
+                float srcH = Math.Max(1, Math.Min(map.Height - srcY, sh));
+
                 g.InterpolationMode = InterpolationMode.HighQualityBicubic;
                 g.PixelOffsetMode = PixelOffsetMode.HighQuality;
                 using (var attrs = new ImageAttributes())
                 {
-                    attrs.SetWrapMode(WrapMode.TileFlipXY); // no dark fringe at the edges
-                    g.DrawImage(map, new Rectangle(0, 0, bmp.Width, bmp.Height), src.X, src.Y, src.Width, src.Height, GraphicsUnit.Pixel, attrs);
+                    attrs.SetWrapMode(WrapMode.Clamp); // Clamp strictly prevents horizontal/vertical tiling stripes
+                    g.DrawImage(map, new Rectangle(0, 0, bmp.Width, bmp.Height), srcX, srcY, srcW, srcH, GraphicsUnit.Pixel, attrs);
                 }
             }
             return bmp;
@@ -91,10 +111,12 @@ namespace DeskWidgets
             built = true;
         }
 
-
         static Bitmap BuildCore(Rectangle virtRect, Screen[] screens)
         {
-            var bmp = new Bitmap(Math.Max(1, virtRect.Width / Shrink), Math.Max(1, virtRect.Height / Shrink), PixelFormat.Format32bppPArgb);
+            int bw = Math.Max(1, virtRect.Width / Shrink);
+            int bh = Math.Max(1, virtRect.Height / Shrink);
+            var bmp = new Bitmap(bw, bh, PixelFormat.Format32bppPArgb);
+            bmp.SetResolution(96, 96);
             using (var g = Graphics.FromImage(bmp))
             {
                 g.Clear(ColorTranslator.FromWin32(GetSysColor(COLOR_DESKTOP)));
@@ -163,7 +185,8 @@ namespace DeskWidgets
             float x = screen.X + (screen.Width - w) / 2 - virtRect.X, y = screen.Y + (screen.Height - h) / 2 - virtRect.Y;
             var state = g.Save();
             g.SetClip(new RectangleF((screen.X - virtRect.X) / (float)Shrink, (screen.Y - virtRect.Y) / (float)Shrink, screen.Width / (float)Shrink, screen.Height / (float)Shrink));
-            g.DrawImage(img, x / Shrink, y / Shrink, w / Shrink, h / Shrink);
+            g.DrawImage(img, new RectangleF(x / Shrink, y / Shrink, w / Shrink, h / Shrink),
+                             new RectangleF(0, 0, img.Width, img.Height), GraphicsUnit.Pixel);
             g.Restore(state);
         }
     }

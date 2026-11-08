@@ -61,7 +61,8 @@ namespace DeskWidgets.Widgets
 
         protected string Face { get { return Settings.Get("face", DefaultFace); } }
         protected virtual string DefaultFace { get { return "glass"; } }
-        protected bool IsGlass { get { return Face == "glass" || Face == "vibrant" || Face == "default"; } }
+        protected bool IsGlass { get { return Face == "glass" || Face == "clear" || Face == "vibrant" || Face == "default"; } }
+        protected bool IsClear { get { return Face == "clear"; } }
         protected bool IsVibrant { get { return Face == "vibrant"; } }
         protected bool IsDark { get { return Face != "light"; } }
         protected Palette Pal { get { return IsVibrant ? VibrantPalette : Face == "light" ? LightPalette : DarkPalette; } }
@@ -131,34 +132,51 @@ namespace DeskWidgets.Widgets
             }
             var state = g.Save();
             g.SetClip(card);
+
+            // 1. Refracted wallpaper backdrop
             g.DrawImageUnscaled(backdrop, 0, 0);
-            Color glassFill = IsDark ? Color.FromArgb(175, 20, 20, 24) : Color.FromArgb(185, 250, 250, 252);
+
+            // 2. Liquid Glass Translucent Base:
+            // Follows @zakisheriff/liquid-glass --lg-panel-fill:
+            // In dark mode: rgb(30 30 33 / 0.62) (frosted) or rgb(30 30 33 / 0.22) (clear)
+            // In light mode: rgb(255 255 255 / 0.62)
+            Color glassFill = IsDark
+                ? (IsClear ? Color.FromArgb(56, 30, 30, 33) : Color.FromArgb(158, 30, 30, 33))
+                : (IsClear ? Color.FromArgb(60, 255, 255, 255) : Color.FromArgb(158, 255, 255, 255));
             using (var b = new SolidBrush(glassFill)) g.FillPath(b, card);
 
+            // 3. Subtle incident light reflection (No harsh horizontal bands)
             using (var grad = new LinearGradientBrush(new PointF(0, 0), new PointF(W, H),
-                IsDark ? Color.FromArgb(32, 255, 255, 255) : Color.FromArgb(70, 255, 255, 255),
+                IsDark ? Color.FromArgb(18, 255, 255, 255) : Color.FromArgb(40, 255, 255, 255),
                 Color.FromArgb(0, 255, 255, 255)))
             {
                 g.FillPath(grad, card);
             }
 
-            using (var topBloom = new LinearGradientBrush(new PointF(0, 0), new PointF(0, P(28)),
-                IsDark ? Color.FromArgb(18, 255, 255, 255) : Color.FromArgb(40, 255, 255, 255),
-                Color.FromArgb(0, 255, 255, 255)))
-            {
-                g.FillPath(topBloom, card);
-            }
-
             g.Restore(state);
-            using (var rimPen = new Pen(IsDark ? Color.FromArgb(60, 255, 255, 255) : Color.FromArgb(130, 255, 255, 255), 1f))
+
+            // 4. Subtle Hairline Edge matching official --lg-edge
+            // rgb(255 255 255 / 0.09) in dark, rgb(0 0 0 / 0.06) in light
+            Color edgeColor = IsDark
+                ? Color.FromArgb(23, 255, 255, 255)
+                : Color.FromArgb(15, 0, 0, 0);
+            using (var edgePen = new Pen(edgeColor, 1f))
             {
-                g.DrawPath(rimPen, card);
+                g.DrawPath(edgePen, card);
             }
 
-            using (var shadowPen = new Pen(IsDark ? Color.FromArgb(40, 0, 0, 0) : Color.FromArgb(20, 0, 0, 0), 1f))
+            // 5. Snell's Law Specular Rim Highlight (--lg-rim):
+            // Soft specular reflection along the upper rim
+            float r = P(14);
+            using (var rimPen = new Pen(IsDark ? Color.FromArgb(45, 255, 255, 255) : Color.FromArgb(90, 255, 255, 255), 1f))
             {
-                using (var innerPath = RoundRect(new RectangleF(1f, 1f, W - 2f, H - 2f), P(13)))
-                    g.DrawPath(shadowPen, innerPath);
+                using (var topRim = new GraphicsPath())
+                {
+                    topRim.AddArc(0.5f, 0.5f, r * 2, r * 2, 180, 90);
+                    topRim.AddLine(r, 0.5f, W - r, 0.5f);
+                    topRim.AddArc(W - r * 2 - 0.5f, 0.5f, r * 2, r * 2, 270, 90);
+                    g.DrawPath(rimPen, topRim);
+                }
             }
         }
 
@@ -236,6 +254,36 @@ namespace DeskWidgets.Widgets
             }
         }
 
+        public static void DrawLiquidGlassSwitch(Graphics g, RectangleF rect, bool isChecked, bool hover, bool isDark)
+        {
+            float radius = rect.Height / 2f;
+            using (var track = RoundRect(rect, radius))
+            {
+                Color trackFill = isChecked
+                    ? Color.FromArgb(235, 52, 199, 89)
+                    : (isDark ? Color.FromArgb(80, 120, 120, 128) : Color.FromArgb(50, 120, 120, 128));
+                using (var b = new SolidBrush(trackFill)) g.FillPath(b, track);
+
+                using (var pen = new Pen(isDark ? Color.FromArgb(35, 255, 255, 255) : Color.FromArgb(25, 0, 0, 0), 0.8f))
+                    g.DrawPath(pen, track);
+
+                float pad = 2f;
+                float thumbD = rect.Height - pad * 2f;
+                float thumbX = isChecked ? rect.Right - pad - thumbD : rect.Left + pad;
+                float thumbY = rect.Top + pad;
+                var thumbRect = new RectangleF(thumbX, thumbY, thumbD, thumbD);
+
+                using (var sb = new SolidBrush(Color.FromArgb(40, 0, 0, 0)))
+                    g.FillEllipse(sb, thumbX, thumbY + 1.5f, thumbD, thumbD);
+
+                using (var kb = new SolidBrush(Color.FromArgb(245, 255, 255, 255)))
+                    g.FillEllipse(kb, thumbRect);
+
+                using (var kRim = new Pen(Color.FromArgb(140, 255, 255, 255), 1f))
+                    g.DrawEllipse(kRim, thumbRect);
+            }
+        }
+
         public static void DrawLiquidGlassProgressBar(Graphics g, RectangleF track, float pct, Color fillTint, bool isDark)
         {
             float radius = track.Height / 2f;
@@ -301,7 +349,7 @@ namespace DeskWidgets.Widgets
         // Appearance menu entries: { setting value, label }. Weather swaps Dark/Light for its sky.
         protected virtual string[][] AppearanceChoices
         {
-            get { return new[] { new[] { "glass", "Liquid Glass" }, new[] { "dark", "Dark Solid" }, new[] { "light", "Light Solid" } }; }
+            get { return new[] { new[] { "glass", "Liquid Glass (Regular)" }, new[] { "clear", "Liquid Glass (Clear)" }, new[] { "dark", "Dark Solid" }, new[] { "light", "Light Solid" } }; }
         }
 
         // Called after a setting changes: drop caches that depend on it and redraw.
