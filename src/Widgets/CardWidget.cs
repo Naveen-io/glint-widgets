@@ -60,7 +60,8 @@ namespace DeskWidgets.Widgets
         }
 
         protected string Face { get { return Settings.Get("face", DefaultFace); } }
-        protected virtual string DefaultFace { get { return "dark"; } }
+        protected virtual string DefaultFace { get { return "glass"; } }
+        protected bool IsGlass { get { return Face == "glass" || Face == "vibrant" || Face == "default"; } }
         protected bool IsVibrant { get { return Face == "vibrant"; } }
         protected bool IsDark { get { return Face != "light"; } }
         protected Palette Pal { get { return IsVibrant ? VibrantPalette : Face == "light" ? LightPalette : DarkPalette; } }
@@ -101,7 +102,7 @@ namespace DeskWidgets.Widgets
             Palette pal = Pal;
             using (var card = CardPath())
             {
-                if (IsVibrant) DrawFrosted(g, card);
+                if (IsGlass || IsVibrant) DrawLiquidGlassCard(g, card, pal);
                 else
                 {
                     using (var b = new SolidBrush(CardBackground(pal))) g.FillPath(b, card);
@@ -117,7 +118,7 @@ namespace DeskWidgets.Widgets
         Bitmap backdrop;
         Rectangle backdropFor;
 
-        void DrawFrosted(Graphics g, GraphicsPath card)
+        void DrawLiquidGlassCard(Graphics g, GraphicsPath card, Palette pal)
         {
             Size size = new Size((int)Math.Round(W), (int)Math.Round(H));
             // Library previews have no place on screen yet: they get a neutral stand-in.
@@ -131,16 +132,140 @@ namespace DeskWidgets.Widgets
             var state = g.Save();
             g.SetClip(card);
             g.DrawImageUnscaled(backdrop, 0, 0);
-            using (var tint = new SolidBrush(Color.FromArgb(70, 20, 24, 28))) g.FillPath(tint, card);
-            using (var frost = new SolidBrush(Color.FromArgb(28, 255, 255, 255))) g.FillPath(frost, card);
+            Color glassFill = IsDark ? Color.FromArgb(175, 20, 20, 24) : Color.FromArgb(185, 250, 250, 252);
+            using (var b = new SolidBrush(glassFill)) g.FillPath(b, card);
+
+            using (var grad = new LinearGradientBrush(new PointF(0, 0), new PointF(W, H),
+                IsDark ? Color.FromArgb(32, 255, 255, 255) : Color.FromArgb(70, 255, 255, 255),
+                Color.FromArgb(0, 255, 255, 255)))
+            {
+                g.FillPath(grad, card);
+            }
+
+            using (var topBloom = new LinearGradientBrush(new PointF(0, 0), new PointF(0, P(28)),
+                IsDark ? Color.FromArgb(18, 255, 255, 255) : Color.FromArgb(40, 255, 255, 255),
+                Color.FromArgb(0, 255, 255, 255)))
+            {
+                g.FillPath(topBloom, card);
+            }
+
             g.Restore(state);
-            using (var edge = new Pen(Color.FromArgb(60, 255, 255, 255), 1f)) g.DrawPath(edge, card);
+            using (var rimPen = new Pen(IsDark ? Color.FromArgb(60, 255, 255, 255) : Color.FromArgb(130, 255, 255, 255), 1f))
+            {
+                g.DrawPath(rimPen, card);
+            }
+
+            using (var shadowPen = new Pen(IsDark ? Color.FromArgb(40, 0, 0, 0) : Color.FromArgb(20, 0, 0, 0), 1f))
+            {
+                using (var innerPath = RoundRect(new RectangleF(1f, 1f, W - 2f, H - 2f), P(13)))
+                    g.DrawPath(shadowPen, innerPath);
+            }
         }
 
         public override void BackdropChanged()
         {
             if (backdrop != null) { backdrop.Dispose(); backdrop = null; }
-            if (IsVibrant) Render();
+            if (IsGlass || IsVibrant) Render();
+        }
+
+        public static void DrawLiquidGlassWell(Graphics g, RectangleF rect, float radius, bool isDark)
+        {
+            using (var path = RoundRect(rect, radius))
+            {
+                Color wellFill = isDark ? Color.FromArgb(80, 10, 10, 14) : Color.FromArgb(45, 0, 0, 0);
+                using (var b = new SolidBrush(wellFill)) g.FillPath(b, path);
+
+                using (var p1 = new Pen(isDark ? Color.FromArgb(60, 0, 0, 0) : Color.FromArgb(25, 0, 0, 0), 1f))
+                    g.DrawPath(p1, path);
+
+                using (var p2 = new Pen(isDark ? Color.FromArgb(25, 255, 255, 255) : Color.FromArgb(50, 255, 255, 255), 1f))
+                {
+                    var bottomR = new RectangleF(rect.X, rect.Y + 1f, rect.Width, rect.Height);
+                    using (var pBottom = RoundRect(bottomR, radius))
+                        g.DrawPath(p2, pBottom);
+                }
+            }
+        }
+
+        public static void DrawLiquidGlassButton(Graphics g, RectangleF rect, string text, Font font, Color textCol, Color baseTint, bool isAccent, bool hover, bool pressed, bool isDark)
+        {
+            float radius = Math.Min(rect.Height / 2f, 8f);
+            using (var path = RoundRect(rect, radius))
+            {
+                Color fill;
+                if (isAccent)
+                {
+                    fill = pressed ? Color.FromArgb(240, 230, 110, 20) : hover ? Color.FromArgb(245, 255, 155, 45) : Color.FromArgb(220, 245, 130, 32);
+                }
+                else
+                {
+                    if (pressed) fill = isDark ? Color.FromArgb(110, 255, 255, 255) : Color.FromArgb(170, 255, 255, 255);
+                    else if (hover) fill = isDark ? Color.FromArgb(65, 255, 255, 255) : Color.FromArgb(120, 255, 255, 255);
+                    else fill = isDark ? Color.FromArgb(38, 255, 255, 255) : Color.FromArgb(70, 255, 255, 255);
+                }
+
+                using (var b = new SolidBrush(fill)) g.FillPath(b, path);
+
+                if (hover && !pressed)
+                {
+                    try
+                    {
+                        using (var glow = new PathGradientBrush(path))
+                        {
+                            glow.CenterColor = Color.FromArgb(40, 255, 255, 255);
+                            glow.SurroundColors = new[] { Color.FromArgb(0, 255, 255, 255) };
+                            g.FillPath(glow, path);
+                        }
+                    }
+                    catch { }
+                }
+
+                Color rim = isAccent
+                    ? Color.FromArgb(120, 255, 255, 255)
+                    : (isDark ? Color.FromArgb(hover ? 90 : 50, 255, 255, 255) : Color.FromArgb(hover ? 160 : 90, 255, 255, 255));
+                using (var pen = new Pen(rim, 1f))
+                    g.DrawPath(pen, path);
+
+                var sf = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center
+                };
+                using (var tb = new SolidBrush(textCol))
+                    g.DrawString(text, font, tb, rect, sf);
+            }
+        }
+
+        public static void DrawLiquidGlassProgressBar(Graphics g, RectangleF track, float pct, Color fillTint, bool isDark)
+        {
+            float radius = track.Height / 2f;
+            DrawLiquidGlassWell(g, track, radius, isDark);
+
+            if (pct > 0.01f)
+            {
+                float fillW = Math.Max(track.Height, track.Width * Math.Min(1f, pct));
+                var fillRect = new RectangleF(track.X, track.Y, fillW, track.Height);
+                using (var p = RoundRect(fillRect, radius))
+                {
+                    using (var b = new SolidBrush(fillTint)) g.FillPath(b, p);
+
+                    var hlRect = new RectangleF(fillRect.X, fillRect.Y, fillRect.Width, fillRect.Height * 0.5f);
+                    using (var hl = new LinearGradientBrush(hlRect.Location, new PointF(hlRect.Left, hlRect.Bottom),
+                        Color.FromArgb(90, 255, 255, 255), Color.FromArgb(10, 255, 255, 255)))
+                    {
+                        using (var hlp = RoundRect(fillRect, radius))
+                        {
+                            var oldClip = g.Clip;
+                            g.SetClip(hlp);
+                            g.FillRectangle(hl, hlRect);
+                            g.Clip = oldClip;
+                        }
+                    }
+
+                    using (var edge = new Pen(Color.FromArgb(100, 255, 255, 255), 1f))
+                        g.DrawPath(edge, p);
+                }
+            }
         }
 
         // Widgets that cover the card with an image use a dark backing so no light edge shows at the corners.
@@ -176,7 +301,7 @@ namespace DeskWidgets.Widgets
         // Appearance menu entries: { setting value, label }. Weather swaps Dark/Light for its sky.
         protected virtual string[][] AppearanceChoices
         {
-            get { return new[] { new[] { "dark", "Dark" }, new[] { "light", "Light" }, new[] { "vibrant", "Vibrant" } }; }
+            get { return new[] { new[] { "glass", "Liquid Glass" }, new[] { "dark", "Dark Solid" }, new[] { "light", "Light Solid" } }; }
         }
 
         // Called after a setting changes: drop caches that depend on it and redraw.

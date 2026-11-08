@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -8,10 +9,8 @@ using System.Text;
 using DeskWidgets;
 using DeskWidgets.Widgets;
 
-// Medium: today's date and the next events on the left, the month on the right.
-// The month needs nothing. Events come from calendar subscription links (.ics: Google,
-// Outlook, iCloud), stored encrypted, fetched every 15 minutes and cached for offline use.
-[DeskWidget(Name = "Calendar", Description = "Today, your next events and the month")]
+// Medium: today's date and the next events on the left, the month on the right in liquid glass.
+[DeskWidget(Name = "Calendar", Description = "Today, your next events and the month in liquid glass")]
 public sealed class CalendarWidget : CardWidget
 {
     List<CalEvent> events = new List<CalEvent>();
@@ -184,16 +183,21 @@ public sealed class CalendarWidget : CardWidget
         if (upcoming.Count == 0)
         {
             bool linked = !IsHandleCreated || Links.Count > 0;
-            Label(g, linked ? (status ?? "No more events today") : "No calendar linked", F(11, "regular"), pal.Fg2, m, y, leftW, StringAlignment.Near);
-            if (!linked) Label(g, "Click to add one", F(11, "semibold"), pal.Blue, m, y + P(15), leftW, StringAlignment.Near);
+            var noEventRect = new RectangleF(m - P(2), y - P(2), leftW + P(4), P(36));
+            DrawLiquidGlassWell(g, noEventRect, P(6), IsDark);
+            Label(g, linked ? (status ?? "No more events today") : "No calendar linked", F(10, "regular"), pal.Fg2, m + P(4), y + P(4), leftW - P(8), StringAlignment.Near);
+            if (!linked) Label(g, "Click to add one", F(10, "semibold"), pal.Blue, m + P(4), y + P(18), leftW - P(8), StringAlignment.Near);
         }
         foreach (var e in upcoming.Take(2))
         {
             Color c = calColors[e.Calendar % calColors.Length];
-            FillRound(g, c, new RectangleF(m, y + P(1), P(3), P(26)), P(1.5f));
-            Label(g, e.Title, F(13, "semibold"), pal.Fg, m + P(8), y - P(1), leftW - P(8), StringAlignment.Near);
-            Label(g, When(e, today, culture), F(11, "regular"), pal.Fg2, m + P(8), y + P(15), leftW - P(8), StringAlignment.Near);
-            y += P(34);
+            var evRect = new RectangleF(m - P(2), y - P(2), leftW + P(4), P(32));
+            DrawLiquidGlassWell(g, evRect, P(6), IsDark);
+
+            FillRound(g, c, new RectangleF(m + P(2), y + P(3), P(3), P(22)), P(1.5f));
+            Label(g, e.Title, F(12, "semibold"), pal.Fg, m + P(10), y - P(1), leftW - P(12), StringAlignment.Near);
+            Label(g, When(e, today, culture), F(10, "regular"), pal.Fg2, m + P(10), y + P(14), leftW - P(12), StringAlignment.Near);
+            y += P(36);
         }
 
         // Right: the month grid.
@@ -218,7 +222,14 @@ public sealed class CalendarWidget : CardWidget
             Font f = F(11, d == today ? "bold" : "semibold");
             if (d == today)
             {
-                FillCircle(g, pal.Red, cx, cy, Math.Min(cw, rowH) * 0.5f);
+                float r = Math.Min(cw, rowH) * 0.48f;
+                var dayRect = new RectangleF(cx - r, cy - r, r * 2, r * 2);
+                using (var path = new GraphicsPath())
+                {
+                    path.AddEllipse(dayRect);
+                    using (var b = new SolidBrush(Color.FromArgb(235, 235, 60, 60))) g.FillPath(b, path);
+                    using (var pen = new Pen(Color.FromArgb(140, 255, 255, 255), 1f)) g.DrawPath(pen, path);
+                }
                 Label(g, d.Day.ToString(culture), f, pal.OnAccent, cx, cy - f.GetHeight() / 2, cw, StringAlignment.Center);
             }
             else Label(g, d.Day.ToString(culture), f, d.Month == today.Month ? pal.Fg : faded, cx, cy - f.GetHeight() / 2, cw, StringAlignment.Center);
@@ -238,26 +249,15 @@ public sealed class CalendarWidget : CardWidget
         string day = e.Start.Date <= today ? "" : e.Start.Date == today.AddDays(1) ? "Tomorrow, " : e.Start.ToString("ddd, ", c);
         if (e.AllDay) return e.Start.Date <= today ? "All day" : day + "all day";
         string t = e.Start.ToString("t", c);
-        if (e.Start.Date <= today && e.End.Date == e.Start.Date && e.End > e.Start) t += " – " + e.End.ToString("t", c);
-        return day + t;
+        return day + (t.Length > 0 ? t : "all day");
     }
 
     static List<CalEvent> SampleEvents(DateTime today)
     {
         return new List<CalEvent>
         {
-            new CalEvent { Title = "Design sync", Start = today.AddHours(16), End = today.AddHours(16.5), Calendar = 0 },
-            new CalEvent { Title = "Gym", Start = today.AddHours(18.5), End = today.AddHours(19.5), Calendar = 1 },
+            new CalEvent { Title = "Design Review", Start = today.AddHours(14), End = today.AddHours(15), Calendar = 0 },
+            new CalEvent { Title = "Team Sync", Start = today.AddHours(16), End = today.AddHours(17), Calendar = 1 }
         };
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            refresh.Dispose();
-            PluginApi.PublishCalendar(this, null);
-        }
-        base.Dispose(disposing);
     }
 }

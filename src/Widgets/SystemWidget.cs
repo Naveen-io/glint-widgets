@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 using DeskWidgets;
 using DeskWidgets.Widgets;
 
-[DeskWidget(Name = "System", Description = "CPU, memory and disk")]
+[DeskWidget(Name = "System", Description = "CPU, memory and disk in liquid glass")]
 public sealed class SystemWidget : CardWidget
 {
     const int History = 30;
@@ -89,47 +89,79 @@ public sealed class SystemWidget : CardWidget
         List<float> cpu = this.cpu.Count < 2 && !IsHandleCreated ? PreviewSeries : this.cpu;
         float now = cpu.Count > 0 ? cpu[cpu.Count - 1] : 0;
 
-        Label(g, "CPU", F(11, "semibold"), pal.Fg2, m, m);
-        Label(g, Math.Round(now) + "%", F(26, "semibold"), pal.Fg, m - P(1), m + P(11));
+        Label(g, "CPU Activity", F(11, "semibold"), pal.Fg2, m, m - P(1));
+        Label(g, Math.Round(now) + "%", F(24, "bold"), pal.Fg, m - P(1), m + P(12));
+
+        // Activity badge at top right
+        float tagW = P(64), tagH = P(20);
+        var tagRect = new RectangleF(W - m - tagW, m - P(2), tagW, tagH);
+        DrawLiquidGlassWell(g, tagRect, tagH / 2f, IsDark);
+        using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+        {
+            using (var b = new SolidBrush(Color.FromArgb(50, 180, 255)))
+                g.DrawString("Realtime", F(9, "semibold"), b, tagRect, sf);
+        }
 
         float top = P(62), h = P(30);
         float max = 40;
         foreach (var v in cpu) max = Math.Max(max, v * 1.25f);
-        using (var grid = new Pen(pal.Sep, 1))
-            for (int i = 1; i <= 3; i++) g.DrawLine(grid, m, top + h * i / 4, m + w, top + h * i / 4);
+
+        // Recessed liquid glass chart well
+        var chartBox = new RectangleF(m, top - P(2), w, h + P(4));
+        DrawLiquidGlassWell(g, chartBox, P(6), IsDark);
+
+        using (var grid = new Pen(IsDark ? Color.FromArgb(25, 255, 255, 255) : Color.FromArgb(15, 0, 0, 0), 1))
+        {
+            for (int i = 1; i <= 3; i++)
+                g.DrawLine(grid, m + P(4), top + h * i / 4, m + w - P(4), top + h * i / 4);
+        }
+
         if (cpu.Count > 1)
         {
             var pts = new PointF[cpu.Count];
-            float step = w / (History - 1), x0 = m + w - step * (cpu.Count - 1);
-            for (int i = 0; i < cpu.Count; i++) pts[i] = new PointF(x0 + i * step, top + h - cpu[i] / max * h);
+            float step = (w - P(8)) / (History - 1), x0 = m + P(4) + (w - P(8)) - step * (cpu.Count - 1);
+            for (int i = 0; i < cpu.Count; i++)
+                pts[i] = new PointF(x0 + i * step, top + h - (cpu[i] / max * (h - P(4))));
+
             using (var area = new GraphicsPath())
             {
                 area.AddLines(pts);
                 area.AddLine(pts[pts.Length - 1], new PointF(pts[pts.Length - 1].X, top + h));
                 area.AddLine(new PointF(pts[pts.Length - 1].X, top + h), new PointF(pts[0].X, top + h));
                 area.CloseFigure();
-                using (var b = new SolidBrush(Color.FromArgb(60, pal.Blue))) g.FillPath(b, area);
+
+                var gradRect = new RectangleF(m, top, w, h);
+                using (var grad = new LinearGradientBrush(gradRect.Location, new PointF(gradRect.Left, gradRect.Bottom),
+                    Color.FromArgb(80, 0, 160, 255), Color.FromArgb(5, 0, 120, 255)))
+                {
+                    g.FillPath(grad, area);
+                }
             }
-            using (var pen = new Pen(pal.Blue, P(1.5f)) { LineJoin = LineJoin.Round })
+
+            using (var pen = new Pen(Color.FromArgb(255, 60, 180, 255), P(1.5f)) { LineJoin = LineJoin.Round })
                 g.DrawLines(pen, pts);
+
+            // Apex indicator dot with specular halo
             var last = pts[pts.Length - 1];
-            FillCircle(g, pal.Blue, last.X - P(1.5f), last.Y, P(2.2f));
+            using (var halo = new SolidBrush(Color.FromArgb(80, 60, 180, 255)))
+                g.FillEllipse(halo, last.X - P(4), last.Y - P(4), P(8), P(8));
+            using (var core = new SolidBrush(Color.White))
+                g.FillEllipse(core, last.X - P(2), last.Y - P(2), P(4), P(4));
         }
 
         Meter(g, pal, "Memory", memUsedGb.ToString("0.0") + " of " + Math.Round(memTotalGb) + " GB",
-            memTotalGb > 0 ? (float)(memUsedGb / memTotalGb) : 0, pal.Purple, P(100));
+            memTotalGb > 0 ? (float)(memUsedGb / memTotalGb) : 0, Color.FromArgb(175, 82, 222), P(102));
         Meter(g, pal, "Disk " + Drive + ":", diskUsed < 0 ? "—" : Math.Round(diskUsed) + "% used",
-            diskUsed < 0 ? 0 : diskUsed / 100f, pal.Orange, P(126));
+            diskUsed < 0 ? 0 : diskUsed / 100f, Color.FromArgb(255, 149, 0), P(128));
     }
 
     void Meter(Graphics g, Palette pal, string name, string value, float fraction, Color color, float y)
     {
         float m = P(16), w = W - m * 2;
         Label(g, name, F(11, "semibold"), pal.Fg, m, y);
-        Label(g, value, F(11, "regular"), pal.Fg2, W - m, y, w * 0.6f, StringAlignment.Far);
-        float by = y + P(16), bh = P(5);
-        FillRound(g, pal.Fill, new RectangleF(m, by, w, bh), bh / 2);
-        if (fraction > 0) FillRound(g, color, new RectangleF(m, by, Math.Max(bh, w * Math.Min(1, fraction)), bh), bh / 2);
+        Label(g, value, F(10, "regular"), pal.Fg2, W - m, y, w * 0.6f, StringAlignment.Far);
+        float by = y + P(15), bh = P(5);
+        DrawLiquidGlassProgressBar(g, new RectangleF(m, by, w, bh), fraction, color, IsDark);
     }
 
     protected override void BuildWidgetMenu(PopupMenu menu)

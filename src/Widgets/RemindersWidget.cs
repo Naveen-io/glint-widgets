@@ -1,22 +1,20 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Linq;
 using DeskWidgets;
 using DeskWidgets.Widgets;
 
-// Medium: open reminder count and up to four reminders you can tick off.
-// Click a circle to complete it, click anywhere else to add one. Optionally shows today's
-// events from your Calendar widget as reminders too (ticking one only affects this list).
-[DeskWidget(Name = "Reminders", Description = "Tick off reminders and today's events")]
+// Medium: open reminder count and up to four reminders you can tick off in liquid glass.
+[DeskWidget(Name = "Reminders", Description = "Tick off reminders and today's events in liquid glass")]
 public sealed class RemindersWidget : CardWidget
 {
     const int Rows = 4;
 
     sealed class Item { public string Text; public bool Done; }
 
-    // One line in the list: either a stored reminder or one of today's calendar events.
     sealed class Row
     {
         public string Text, Time;
@@ -39,7 +37,6 @@ public sealed class RemindersWidget : CardWidget
         if (ShowEvents) Render();
     }
 
-    // Redraw each minute while showing events, so finished ones drop off.
     protected override int NextFrameDelay()
     {
         if (!ShowEvents || !IsHandleCreated) return -1;
@@ -47,7 +44,6 @@ public sealed class RemindersWidget : CardWidget
         return (60 - now.Second) * 1000 - now.Millisecond + 300;
     }
 
-    // Stored one per line as "0|text" (open) or "1|text" (done).
     List<Item> Items
     {
         get
@@ -62,7 +58,6 @@ public sealed class RemindersWidget : CardWidget
         }
     }
 
-    // Calendar events ticked off today, as "title|startTicks" keys.
     HashSet<string> DoneEvents
     {
         get { return new HashSet<string>(Settings.GetText("doneEvents", "").Split('\n').Where(k => k.Length > 0)); }
@@ -70,8 +65,6 @@ public sealed class RemindersWidget : CardWidget
 
     static string KeyOf(CalEvent e) { return e.Title.Replace('\n', ' ') + "|" + e.Start.Ticks; }
 
-    // Today's events (still to come, or ticked) first in time order, then open reminders, then
-    // completed ones to fill the space.
     List<Row> BuildRows(List<Item> items)
     {
         var rows = new List<Row>();
@@ -84,7 +77,7 @@ public sealed class RemindersWidget : CardWidget
             {
                 string key = KeyOf(e);
                 bool isDone = done.Contains(key);
-                if (!isDone && e.End <= now) continue; // over and not ticked: let it go
+                if (!isDone && e.End <= now) continue;
                 rows.Add(new Row { Text = e.Title, Time = e.AllDay ? "All day" : e.Start.ToString("t", culture), Done = isDone, EventKey = key });
             }
         }
@@ -126,7 +119,6 @@ public sealed class RemindersWidget : CardWidget
         }
         else
         {
-            // Keep only today's keys so the list doesn't grow forever.
             long todayTicks = DateTime.Today.Ticks, tomorrowTicks = DateTime.Today.AddDays(1).Ticks;
             var done = new HashSet<string>(DoneEvents.Where(k =>
             {
@@ -170,36 +162,65 @@ public sealed class RemindersWidget : CardWidget
         var rows = BuildRows(items);
         int open = rows.Count(r => !r.Done);
 
-        // Left: badge, count, title.
+        // Left: Liquid Glass badge, count, title.
         float br = P(14);
-        FillCircle(g, pal.Blue, m + br, m + br, br);
-        using (var b = new SolidBrush(pal.OnAccent))
+        var badgeBox = new RectangleF(m, m, br * 2, br * 2);
+        using (var bPath = new GraphicsPath())
+        {
+            bPath.AddEllipse(badgeBox);
+            using (var b = new SolidBrush(Color.FromArgb(235, 10, 132, 255))) g.FillPath(b, bPath);
+            using (var pen = new Pen(Color.FromArgb(140, 255, 255, 255), 1f)) g.DrawPath(pen, bPath);
+        }
+
+        using (var b = new SolidBrush(Color.White))
             for (int k = 0; k < 3; k++)
             {
                 float y = m + br - P(5) + k * P(5);
                 g.FillEllipse(b, m + br - P(6), y - P(1.2f), P(2.4f), P(2.4f));
                 g.FillRectangle(b, m + br - P(2), y - P(0.8f), P(8), P(1.6f));
             }
+
         Label(g, open.ToString(), F(30, "semibold"), pal.Fg, m - P(1), H - m - P(58));
         Label(g, "Reminders", F(13, "semibold"), pal.Blue, m, H - m - P(16), P(100), StringAlignment.Near);
 
         // Right: rows.
         float x = ListX, right = W - m;
         if (rows.Count == 0)
-            Label(g, "All done. Click to add a reminder.", F(13, "regular"), pal.Fg2, x, H / 2 - P(9), right - x, StringAlignment.Near);
+        {
+            var emptyBox = new RectangleF(x, H / 2 - P(18), right - x, P(36));
+            DrawLiquidGlassWell(g, emptyBox, P(6), IsDark);
+            using (var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+            {
+                using (var b = new SolidBrush(pal.Fg2))
+                    g.DrawString("All done. Click to add a reminder.", F(11, "regular"), b, emptyBox, sf);
+            }
+            return;
+        }
+
         int shown = Math.Min(Rows, rows.Count);
         for (int i = 0; i < shown; i++)
         {
             Row it = rows[i];
             float top = RowTop(i), cy = top + RowH / 2, r = P(9);
-            Color ring = it.EventKey != null ? pal.Red : pal.Blue; // events wear the Calendar's red
+            Color ring = it.EventKey != null ? pal.Red : pal.Blue;
+
+            var checkRect = new RectangleF(x, cy - r, r * 2, r * 2);
             if (it.Done)
             {
-                FillCircle(g, ring, x + r, cy, r);
-                FillCircle(g, pal.OnAccent, x + r, cy, P(3.2f));
+                using (var path = new GraphicsPath())
+                {
+                    path.AddEllipse(checkRect);
+                    using (var b = new SolidBrush(ring)) g.FillPath(b, path);
+                    using (var pen = new Pen(Color.FromArgb(140, 255, 255, 255), 1f)) g.DrawPath(pen, path);
+                }
+                FillCircle(g, Color.White, x + r, cy, P(3.2f));
             }
             else
-                using (var pen = new Pen(it.EventKey != null ? ring : pal.Fg2, P(1.5f))) g.DrawEllipse(pen, x, cy - r, r * 2, r * 2);
+            {
+                DrawLiquidGlassWell(g, checkRect, r, IsDark);
+                using (var pen = new Pen(it.EventKey != null ? ring : (IsDark ? Color.FromArgb(70, 255, 255, 255) : Color.FromArgb(120, 0, 0, 0)), 1.2f))
+                    g.DrawEllipse(pen, checkRect);
+            }
 
             Font f = F(13, "regular");
             float tx = x + P(26), ty = cy - f.GetHeight() / 2, tw = right - tx;
@@ -219,7 +240,8 @@ public sealed class RemindersWidget : CardWidget
                     g.DrawLine(pen, tx, cy + P(1), tx + lw, cy + P(1));
                 }
             if (i < shown - 1)
-                using (var sep = new Pen(pal.Sep, 1)) g.DrawLine(sep, x + P(26), top + RowH, right, top + RowH);
+                using (var sep = new Pen(IsDark ? Color.FromArgb(20, 255, 255, 255) : Color.FromArgb(15, 0, 0, 0), 1))
+                    g.DrawLine(sep, x + P(26), top + RowH, right, top + RowH);
         }
     }
 
